@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title id="page-title">Календар на БФП - Абониране и Синхронизиране</title>
+    <!-- Включваме надеждна библиотека за QR кодове, която работи и офлайн/локално -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        :root {
+            --primary: #1a73e8;
+            --primary-hover: #1557b0;
+            --bg: #f8f9fa;
+            --card-bg: #ffffff;
+            --text-main: #202124;
+            --text-sub: #5f6368;
+            --border: #dadce0;
+        }
+
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+
+        body {
+            background-color: var(--bg);
+            color: var(--text-main);
+            line-height: 1.5;
+            padding: 24px 16px;
+        }
+
+
+        .container {
+            max-width: 950px;
+            margin: 0 auto;
+        }
+
+
+        header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+
+        header h1 {
+            font-size: 2rem;
+            color: var(--text-main);
+            margin-bottom: 8px;
+        }
+
+
+        header p {
+            color: var(--text-sub);
+            font-size: 1rem;
+        }
+
+
+        .cards-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 20px;
+            justify-items: center;
+            margin-bottom: 32px;
+        }
+
+
+        @media (min-width: 768px) {
+            .cards-grid {
+                grid-template-columns: repeat(3, 1fr);
+                justify-items: stretch;
+            }
+        }
+
+
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 24px;
+            text-align: center;
+            width: 100%;
+            max-width: 400px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+
+        @media (min-width: 768px) {
+            .card {
+                max-width: none;
+            }
+        }
+
+
+        .card h2 {
+            font-size: 1.15rem;
+            margin-bottom: 8px;
+        }
+
+
+        .card p {
+            font-size: 0.875rem;
+            color: var(--text-sub);
+            margin-bottom: 16px;
+            min-height: 40px;
+        }
+
+
+        .qr-wrapper {
+            background: #fff;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 12px;
+            display: inline-flex;
+            justify-content: center;
+            align-items: center;
+            margin: 0 auto 16px auto;
+            width: 154px;
+            height: 154px;
+        }
+
+
+        .btn {
+            display: inline-block;
+            background-color: var(--primary);
+            color: white;
+            text-decoration: none;
+            padding: 10px 16px;
+            border-radius: 6px;
+            font-weight: 500;
+            font-size: 0.9rem;
+            transition: background-color 0.2s;
+        }
+
+
+        .btn:hover {
+            background-color: var(--primary-hover);
+        }
+
+
+        .embed-section {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 24px;
+        }
+
+
+        .embed-section h2 {
+            font-size: 1.25rem;
+            margin-bottom: 16px;
+            text-align: center;
+        }
+
+
+        .iframe-container {
+            position: relative;
+            width: 100%;
+            height: 450px;
+            border-radius: 8px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+
+
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: 0;
+        }
+
+
+        footer {
+            text-align: center;
+            margin-top: 32px;
+            color: var(--text-sub);
+            font-size: 0.8rem;
+        }
+    </style>
+</head>
+<body>
+
+
+<div class="container">
+    <header>
+        <h1 id="main-heading">Календар на БФП</h1>
+        <p id="sub-heading">Абонирайте се, за да поддържате събитията на БФП автоматично синхронизирани на телефона или компютъра си.</p>
+    </header>
+
+
+    <div class="cards-grid">
+        <!-- 1. Google Calendar Direct -->
+        <div class="card">
+            <div>
+                <h2 id="card1-title">Google Календар</h2>
+                <p id="card1-desc">Добавете директно към личния си Google профил с едно кликване.</p>
+                <div class="qr-wrapper" id="qr-google"></div>
+            </div>
+            <a id="link-google" 
+               href="https://calendar.google.com/calendar/render?cid=c_40badfc66bb08e57ff6be29b6a3350909bec136dd4ac957c0cae51b87ab41291%40group.calendar.google.com" 
+               target="_blank" 
+               class="btn">Добави в Google</a>
+        </div>
+
+
+        <!-- 2. Cross-Platform Auto-Sync (Webcal for Apple / Outlook) -->
+        <div class="card">
+            <div>
+                <h2 id="card2-title">Apple & Outlook (На живо)</h2>
+                <p id="card2-desc">Автоматично синхронизиране за iOS, macOS или Outlook чрез iCal връзка.</p>
+                <div class="qr-wrapper" id="qr-webcal"></div>
+            </div>
+            <a id="link-webcal" 
+               href="webcal://calendar.google.com/calendar/ical/c_40badfc66bb08e57ff6be29b6a3350909bec136dd4ac957c0cae51b87ab41291%40group.calendar.google.com/public/basic.ics" 
+               class="btn">Абониране (iCal)</a>
+        </div>
+
+
+        <!-- 3. Standard ICS File Download -->
+        <div class="card">
+            <div>
+                <h2 id="card3-title">Изтегляне на .ICS файл</h2>
+                <p id="card3-desc">Изтеглете статичен файл за ръчно импортиране в друг софтуер.</p>
+                <div class="qr-wrapper" id="qr-ics"></div>
+            </div>
+            <a id="link-ics" 
+               href="https://calendar.google.com/calendar/ical/c_40badfc66bb08e57ff6be29b6a3350909bec136dd4ac957c0cae51b87ab41291%40group.calendar.google.com/public/basic.ics" 
+               target="_blank" 
+               class="btn">Изтегляне .ICS</a>
+        </div>
+    </div>
+
+
+    <!-- Embedded Calendar View -->
+    <div class="embed-section">
+        <h2 id="preview-title">Преглед на живо</h2>
+        <div class="iframe-container">
+            <iframe src="https://calendar.google.com/calendar/embed?src=c_40badfc66bb08e57ff6be29b6a3350909bec136dd4ac957c0cae51b87ab41291%40group.calendar.google.com&ctz=UTC" loading="lazy"></iframe>
+        </div>
+    </div>
+
+
+    <footer>
+        <p id="footer-text">Страница за споделен достъп до Календар на БФП</p>
+    </footer>
+</div>
+
+
+<script>
+    // Преводи за различните езици
+    const translations = {
+        fr: {
+            title: "Calendrier de la FFB - S'abonner et Synchroniser",
+            mainHeading: "Calendrier de la FFB",
+            subHeading: "Abonnez-vous pour synchroniser automatiquement les événements de la FFB sur votre téléphone ou ordinateur.",
+            card1Title: "Google Agenda",
+            card1Desc: "Ajoutez directement à votre compte Google personnel en un clic.",
+            card1Btn: "Ajouter à Google",
+            card2Title: "Apple & Outlook (Synchro Live)",
+            card2Desc: "Synchronisez nativement sur iOS, macOS ou Outlook via un lien iCal.",
+            card2Btn: "S'abonner (iCal)",
+            card3Title: "Télécharger le fichier .ICS",
+            card3Desc: "Téléchargez un fichier statique pour importer manuellement les événements.",
+            card3Btn: "Télécharger .ICS",
+            previewTitle: "Aperçu en direct",
+            footerText: "Page d'accès partagé du calendrier de la FFB"
+        },
+        bg: {
+            title: "Календар на БФП - Абониране и Синхронизиране",
+            mainHeading: "Календар на БФП",
+            subHeading: "Абонирайте се, за да поддържате събитията на БФП автоматично синхронизирани на телефона или компютъра си.",
+            card1Title: "Google Календар",
+            card1Desc: "Добавете директно към личния си Google профил с едно кликване.",
+            card1Btn: "Добави в Google",
+            card2Title: "Apple & Outlook (На живо)",
+            card2Desc: "Автоматично синхронизиране за iOS, macOS или Outlook чрез iCal връзка.",
+            card2Btn: "Абониране (iCal)",
+            card3Title: "Изтегляне на .ICS файл",
+            card3Desc: "Изтеглете статичен файл за ръчно импортиране в друг софтуер.",
+            card3Btn: "Изтегляне .ICS",
+            previewTitle: "Преглед на живо",
+            footerText: "Страница за споделен достъп до Календар на БФП"
+        }
+    };
+
+
+    const userLang = (navigator.language || navigator.userLanguage || 'en').substring(0, 2).toLowerCase();
+
+
+    if (translations[userLang]) {
+        const t = translations[userLang];
+        document.getElementById('page-title').innerText = t.title;
+        document.getElementById('main-heading').innerText = t.mainHeading;
+        document.getElementById('sub-heading').innerText = t.subHeading;
+        
+        document.getElementById('card1-title').innerText = t.card1Title;
+        document.getElementById('card1-desc').innerText = t.card1Desc;
+        document.getElementById('link-google').innerText = t.card1Btn;
+
+
+        document.getElementById('card2-title').innerText = t.card2Title;
+        document.getElementById('card2-desc').innerText = t.card2Desc;
+        document.getElementById('link-webcal').innerText = t.card2Btn;
+
+
+        document.getElementById('card3-title').innerText = t.card3Title;
+        document.getElementById('card3-desc').innerText = t.card3Desc;
+        document.getElementById('link-ics').innerText = t.card3Btn;
+
+
+        document.getElementById('preview-title').innerText = t.previewTitle;
+        document.getElementById('footer-text').innerText = t.footerText;
+        
+        document.documentElement.setAttribute('lang', userLang);
+    }
+
+
+    // Генериране на QR кодовете сигурно чрез QRCode.js скрипта
+    new QRCode(document.getElementById("qr-google"), {
+        text: document.getElementById('link-google').href,
+        width: 130,
+        height: 130
+    });
+
+
+    new QRCode(document.getElementById("qr-webcal"), {
+        text: document.getElementById('link-webcal').href,
+        width: 130,
+        height: 130
+    });
+
+
+    new QRCode(document.getElementById("qr-ics"), {
+        text: document.getElementById('link-ics').href,
+        width: 130,
+        height: 130
+    });
+</script>
+
+
+</body>
+</html>
