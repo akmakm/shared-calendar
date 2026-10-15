@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title id="page-title">Календар на БФП - Абониране и Синхронизиране</title>
+    <title id="page-title">Bulgaria Petanque Tournaments</title>
     <!-- Надеждна библиотека за QR кодове, работеща офлайн/локално -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
@@ -62,10 +62,45 @@
             box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         }
 
+        .embed-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
         .embed-section h2 {
             font-size: 1.25rem;
-            margin-bottom: 16px;
-            text-align: center;
+            margin: 0;
+        }
+
+        /* Стилове за превключвателя на календари */
+        .calendar-toggle {
+            display: flex;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 3px;
+        }
+
+        .toggle-btn {
+            background: transparent;
+            border: none;
+            padding: 6px 12px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: var(--text-sub);
+            cursor: pointer;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .toggle-btn.active {
+            background: var(--card-bg);
+            color: var(--primary);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
         }
 
         .iframe-container {
@@ -171,15 +206,21 @@
 
 <div class="container">
     <header>
-        <h1 id="main-heading">Календар на БФП</h1>
-        <p id="sub-heading">Абонирайте се, за да поддържате събитията на БФП автоматично синхронизирани на телефона или компютъра си.</p>
+        <h1 id="main-heading">Bulgaria Petanque Tournaments</h1>
+        <p id="sub-heading">Абонирайте се, за да поддържате събитията автоматично синхронизирани на телефона или компютъра си.</p>
     </header>
 
-    <!-- Преместен блоков елемент с преглед на живо най-отгоре -->
+    <!-- Преглед на живо с вграден бутон за превключване отдясно -->
     <div class="embed-section">
-        <h2 id="preview-title">Преглед на живо</h2>
+        <div class="embed-header">
+            <h2 id="preview-title">Преглед на живо</h2>
+            <div class="calendar-toggle">
+                <button id="btn-cal-1" class="toggle-btn active" onclick="switchCalendar('cal1')">БФП</button>
+                <button id="btn-cal-2" class="toggle-btn" onclick="switchCalendar('cal2')">Алтернативен</button>
+            </div>
+        </div>
         <div class="iframe-container">
-            <iframe src="https://calendar.google.com/calendar/embed?src=c_40badfc66bb08e57ff6be29b6a3350909bec136dd4ac957c0cae51b87ab41291%40group.calendar.google.com&ctz=UTC" loading="lazy"></iframe>
+            <iframe id="calendar-iframe" src="" loading="lazy"></iframe>
         </div>
     </div>
 
@@ -191,10 +232,7 @@
                 <p id="card1-desc">Добавете директно към личния си Google профил с едно кликване.</p>
                 <div class="qr-wrapper" id="qr-google"></div>
             </div>
-            <a id="link-google" 
-               href="https://calendar.google.com/calendar/render?cid=c_40badfc66bb08e57ff6be29b6a3350909bec136dd4ac957c0cae51b87ab41291%40group.calendar.google.com" 
-               target="_blank" 
-               class="btn">Добави в Google</a>
+            <a id="link-google" href="#" target="_blank" class="btn">Добави в Google</a>
         </div>
 
         <!-- 2. Cross-Platform Auto-Sync (Webcal for Apple / Outlook) -->
@@ -204,9 +242,7 @@
                 <p id="card2-desc">Автоматично синхронизиране за iOS, macOS или Outlook чрез iCal връзка.</p>
                 <div class="qr-wrapper" id="qr-webcal"></div>
             </div>
-            <a id="link-webcal" 
-               href="webcal://calendar.google.com/calendar/ical/c_40badfc66bb08e57ff6be29b6a3350909bec136dd4ac957c0cae51b87ab41291%40group.calendar.google.com/public/basic.ics" 
-               class="btn">Абониране (iCal)</a>
+            <a id="link-webcal" href="#" class="btn">Абониране (iCal)</a>
         </div>
 
         <!-- 3. Standard ICS File Download -->
@@ -216,10 +252,7 @@
                 <p id="card3-desc">Изтеглете статичен файл за ръчно импортиране в друг софтуер.</p>
                 <div class="qr-wrapper" id="qr-ics"></div>
             </div>
-            <a id="link-ics" 
-               href="https://calendar.google.com/calendar/ical/c_40badfc66bb08e57ff6be29b6a3350909bec136dd4ac957c0cae51b87ab41291%40group.calendar.google.com/public/basic.ics" 
-               target="_blank" 
-               class="btn">Изтегляне .ICS</a>
+            <a id="link-ics" href="#" target="_blank" class="btn">Изтегляне .ICS</a>
         </div>
     </div>
 
@@ -229,11 +262,51 @@
 </div>
 
 <script>
+    // Идентификатори на календарите
+    const calendars = {
+        cal1: "c_40badfc66bb08e57ff6be29b6a3350909bec136dd4ac957c0cae51b87ab41291@group.calendar.google.com",
+        cal2: "c_999755f1a46e47b62759bc0652928fe68deb0d75cd7241b11c38cc43123808cc@group.calendar.google.com"
+    };
+
+    let qrGoogleInstance = null;
+    let qrWebcalInstance = null;
+    let qrIcsInstance = null;
+
+    function switchCalendar(calKey) {
+        // Промяна на активния бутон в интерфейса
+        document.getElementById('btn-cal-1').classList.toggle('active', calKey === 'cal1');
+        document.getElementById('btn-cal-2').classList.toggle('active', calKey === 'cal2');
+
+        const calId = calendars[calKey];
+        const encodedId = encodeURIComponent(calId);
+
+        // Актуализиране на линковете
+        const googleUrl = `https://calendar.google.com/calendar/render?cid=${encodedId}`;
+        const webcalUrl = `webcal://calendar.google.com/calendar/ical/${encodedId}/public/basic.ics`;
+        const icsUrl = `https://calendar.google.com/calendar/ical/${encodedId}/public/basic.ics`;
+        const embedUrl = `https://calendar.google.com/calendar/embed?src=${encodedId}&ctz=Europe%2FSofia`;
+
+        document.getElementById('link-google').href = googleUrl;
+        document.getElementById('link-webcal').href = webcalUrl;
+        document.getElementById('link-ics').href = icsUrl;
+        document.getElementById('calendar-iframe').src = embedUrl;
+
+        // Прегенериране на QR кодовете на живо
+        document.getElementById('qr-google').innerHTML = "";
+        document.getElementById('qr-webcal').innerHTML = "";
+        document.getElementById('qr-ics').innerHTML = "";
+
+        new QRCode(document.getElementById("qr-google"), { text: googleUrl, width: 130, height: 130 });
+        new QRCode(document.getElementById("qr-webcal"), { text: webcalUrl, width: 130, height: 130 });
+        new QRCode(document.getElementById("qr-ics"), { text: icsUrl, width: 130, height: 130 });
+    }
+
+    // Езикови преводи
     const translations = {
         fr: {
-            title: "Calendrier de la FFB - S'abonner et Synchroniser",
-            mainHeading: "Calendrier de la FFB",
-            subHeading: "Abonnez-vous pour synchroniser automatiquement les événements de la FFB sur votre téléphone ou ordinateur.",
+            title: "Petanque Tournaments en Bulgarie - S'abonner et Synchroniser",
+            mainHeading: "Petanque Tournaments en Bulgarie",
+            subHeading: "Abonnez-vous pour synchroniser automatiquement les événements.",
             card1Title: "Google Agenda",
             card1Desc: "Ajoutez directement à votre compte Google personnel en un clic.",
             card1Btn: "Ajouter à Google",
@@ -241,15 +314,15 @@
             card2Desc: "Synchronisez nativement sur iOS, macOS ou Outlook via un lien iCal.",
             card2Btn: "S'abonner (iCal)",
             card3Title: "Télécharger le fichier .ICS",
-            card3Desc: "Téléchargez un fichier statique pour importer manuellement les événements.",
+            card3Desc: "Téléchargez un fichier statique pour importer manuellement.",
             card3Btn: "Télécharger .ICS",
             previewTitle: "Aperçu en direct",
-            footerText: "Page d'accès partagé du calendrier de la FFB"
+            footerText: "Page d'accès partagé du calendrier"
         },
         bg: {
-            title: "Календар на БФП - Абониране и Синхронизиране",
-            mainHeading: "Календар на БФП",
-            subHeading: "Абонирайте се, за да поддържате събитията на БФП автоматично синхронизирани на телефона или компютъра си.",
+            title: "Петанк Турнири в България - Абониране и Синхронизиране",
+            mainHeading: "Петанк Турнири в България",
+            subHeading: "Абонирайте се, за да поддържате събитията автоматично синхронизирани.",
             card1Title: "Google Календар",
             card1Desc: "Добавете директно към личния си Google профил с едно кликване.",
             card1Btn: "Добави в Google",
@@ -290,23 +363,8 @@
         document.documentElement.setAttribute('lang', userLang);
     }
 
-    new QRCode(document.getElementById("qr-google"), {
-        text: document.getElementById('link-google').href,
-        width: 130,
-        height: 130
-    });
-
-    new QRCode(document.getElementById("qr-webcal"), {
-        text: document.getElementById('link-webcal').href,
-        width: 130,
-        height: 130
-    });
-
-    new QRCode(document.getElementById("qr-ics"), {
-        text: document.getElementById('link-ics').href,
-        width: 130,
-        height: 130
-    });
+    // Инициализация при зареждане на първия календар по подразбиране
+    switchCalendar('cal1');
 </script>
 
 </body>
