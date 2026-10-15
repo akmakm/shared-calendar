@@ -95,6 +95,9 @@
             cursor: pointer;
             border-radius: 6px;
             transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
 
         .toggle-btn.active {
@@ -215,8 +218,8 @@
         <div class="embed-header">
             <h2 id="preview-title">Преглед на живо</h2>
             <div class="calendar-toggle">
-                <button id="btn-cal-1" class="toggle-btn active" onclick="switchCalendar('cal1')">Bulgaria</button>
-                <button id="btn-cal-2" class="toggle-btn" onclick="switchCalendar('cal2')">World</button>
+                <button id="btn-cal-1" class="toggle-btn active" onclick="switchCalendar('cal1')"><span>🇧🇬</span> Bulgaria</button>
+                <button id="btn-cal-2" class="toggle-btn" onclick="switchCalendar('cal2')"><span>🌐</span> World</button>
             </div>
         </div>
         <div class="iframe-container">
@@ -284,7 +287,8 @@
         const googleUrl = `https://calendar.google.com/calendar/render?cid=${encodedId}`;
         const webcalUrl = `webcal://calendar.google.com/calendar/ical/${encodedId}/public/basic.ics`;
         const icsUrl = `https://calendar.google.com/calendar/ical/${encodedId}/public/basic.ics`;
-        const embedUrl = `https://calendar.google.com/calendar/embed?src=${encodedId}&ctz=Europe%2FSofia`;
+        // &wkst=2 sets the week start to Monday (1 = Sunday, 2 = Monday)
+        const embedUrl = `https://calendar.google.com/calendar/embed?src=${encodedId}&ctz=Europe%2FSofia&wkst=2`;
 
         document.getElementById('link-google').href = googleUrl;
         document.getElementById('link-webcal').href = webcalUrl;
@@ -322,18 +326,18 @@
         en: {
             title: "Petanque Tournaments in Bulgaria - Subscribe and Synchronise",
             mainHeading: "Petanque Tournaments in Bulgaria",
-            subHeading: "Subscribe pour synchroniser automatiquement les événements.",
-            card1Title: "Google Agenda",
-            card1Desc: "Add directement à votre compte Google personnel en un clic.",
-            card1Btn: "Add à Google",
-            card2Title: "Apple & Outlook (Synchro Live)",
-            card2Desc: "Synchronise nativement sur iOS, macOS ou Outlook via un lien iCal.",
+            subHeading: "Subscribe to automatically sync events.",
+            card1Title: "Google Calendar",
+            card1Desc: "Add directly to your personal Google account with one click.",
+            card1Btn: "Add to Google",
+            card2Title: "Apple & Outlook (Live Sync)",
+            card2Desc: "Auto-sync natively to iOS, macOS, or Outlook via iCal link.",
             card2Btn: "Subscribe (iCal)",
-            card3Title: "Download le fichier .ICS",
-            card3Desc: "Download un fichier statique pour importer manuellement.",
+            card3Title: "Download .ICS File",
+            card3Desc: "Download a static file to import events manually.",
             card3Btn: "Download .ICS",
             previewTitle: "Live preview",
-            footerText: "Page d'accès partagé du calendrier"
+            footerText: "Shared calendar access page"
         },
         bg: {
             title: "Петанк Турнири в България - Абониране и Синхронизиране",
