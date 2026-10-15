@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title id="page-title">Bulgaria Petanque Tournaments</title>
-    <!-- Надеждна библиотека за QR кодове, работеща офлайн/локално -->
+    <!-- Reliable standalone library for generating QR codes dynamically -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         :root {
@@ -32,7 +32,7 @@
         }
 
         .container {
-            max-width: 950px;
+            max-width: 1100px;
             margin: 0 auto;
         }
 
@@ -52,7 +52,7 @@
             font-size: 1rem;
         }
 
-        /* Преместена секция за преглед на живо в началото */
+        /* Live Calendar Embed Section */
         .embed-section {
             background: var(--card-bg);
             border: 1px solid var(--border);
@@ -76,7 +76,7 @@
             margin: 0;
         }
 
-        /* Стилове за превключвателя на календари */
+        /* Calendar Toggle Controls */
         .calendar-toggle {
             display: flex;
             background: var(--bg);
@@ -109,7 +109,7 @@
         .iframe-container {
             position: relative;
             width: 100%;
-            height: 450px;
+            height: 480px;
             border-radius: 8px;
             overflow: hidden;
             border: 1px solid var(--border);
@@ -121,6 +121,7 @@
             border: 0;
         }
 
+        /* Cards Grid Layout: 1 column mobile, 2 columns tablet, 4 columns desktop */
         .cards-grid {
             display: grid;
             grid-template-columns: 1fr;
@@ -129,9 +130,16 @@
             margin-bottom: 32px;
         }
 
-        @media (min-width: 768px) {
+        @media (min-width: 640px) {
             .cards-grid {
-                grid-template-columns: repeat(3, 1fr);
+                grid-template-columns: repeat(2, 1fr);
+                justify-items: stretch;
+            }
+        }
+
+        @media (min-width: 1024px) {
+            .cards-grid {
+                grid-template-columns: repeat(4, 1fr);
                 justify-items: stretch;
             }
         }
@@ -140,7 +148,7 @@
             background: var(--card-bg);
             border: 1px solid var(--border);
             border-radius: 12px;
-            padding: 24px;
+            padding: 20px 16px;
             text-align: center;
             width: 100%;
             max-width: 400px;
@@ -150,35 +158,35 @@
             box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         }
 
-        @media (min-width: 768px) {
+        @media (min-width: 640px) {
             .card {
                 max-width: none;
             }
         }
 
         .card h2 {
-            font-size: 1.15rem;
+            font-size: 1.1rem;
             margin-bottom: 8px;
         }
 
         .card p {
-            font-size: 0.875rem;
+            font-size: 0.85rem;
             color: var(--text-sub);
             margin-bottom: 16px;
-            min-height: 40px;
+            min-height: 48px;
         }
 
         .qr-wrapper {
             background: #fff;
             border: 1px solid var(--border);
             border-radius: 8px;
-            padding: 12px;
+            padding: 10px;
             display: inline-flex;
             justify-content: center;
             align-items: center;
             margin: 0 auto 16px auto;
-            width: 154px;
-            height: 154px;
+            width: 140px;
+            height: 140px;
         }
 
         .btn {
@@ -186,11 +194,14 @@
             background-color: var(--primary);
             color: white;
             text-decoration: none;
-            padding: 10px 16px;
+            padding: 10px 14px;
             border-radius: 6px;
             font-weight: 500;
-            font-size: 0.9rem;
+            font-size: 0.875rem;
             transition: background-color 0.2s;
+            cursor: pointer;
+            border: none;
+            width: 100%;
         }
 
         .btn:hover {
@@ -213,13 +224,13 @@
         <p id="sub-heading">Абонирайте се, за да поддържате събитията автоматично синхронизирани на телефона или компютъра си.</p>
     </header>
 
-    <!-- Преглед на живо с вграден бутон за превключване отдясно -->
+    <!-- Live Preview Embed Section -->
     <div class="embed-section">
         <div class="embed-header">
             <h2 id="preview-title">Преглед на живо</h2>
             <div class="calendar-toggle">
-                <button id="btn-cal-1" class="toggle-btn active" onclick="switchCalendar('cal1')"><span>🇧🇬</span> Bulgaria</button>
-                <button id="btn-cal-2" class="toggle-btn" onclick="switchCalendar('cal2')"><span>🌐</span> World</button>
+                <button id="btn-cal-1" class="toggle-btn active" onclick="switchCalendar('cal1')">Bulgaria <span>🇧🇬</span></button>
+                <button id="btn-cal-2" class="toggle-btn" onclick="switchCalendar('cal2')"><span>🌐</span></button>
             </div>
         </div>
         <div class="iframe-container">
@@ -257,6 +268,16 @@
             </div>
             <a id="link-ics" href="#" target="_blank" class="btn">Изтегляне .ICS</a>
         </div>
+
+        <!-- 4. Share Web Page (Direct link to window.location.href) -->
+        <div class="card">
+            <div>
+                <h2 id="card4-title">Споделете тази страница</h2>
+                <p id="card4-desc">Сканирайте или копирайте линка, за да отворите тази страница на мобилно устройство.</p>
+                <div class="qr-wrapper" id="qr-page"></div>
+            </div>
+            <button id="btn-copy-page" onclick="copyPageLink()" class="btn">Копирай линка</button>
+        </div>
     </div>
 
     <footer>
@@ -265,29 +286,26 @@
 </div>
 
 <script>
-    // Идентификатори на календарите
+    // Calendar Google IDs
     const calendars = {
         cal1: "c_40badfc66bb08e57ff6be29b6a3350909bec136dd4ac957c0cae51b87ab41291@group.calendar.google.com",
         cal2: "c_999755f1a46e47b62759bc0652928fe68deb0d75cd7241b11c38cc43123808cc@group.calendar.google.com"
     };
 
-    let qrGoogleInstance = null;
-    let qrWebcalInstance = null;
-    let qrIcsInstance = null;
-
     function switchCalendar(calKey) {
-        // Промяна на активния бутон в интерфейса
+        // Toggle active button style
         document.getElementById('btn-cal-1').classList.toggle('active', calKey === 'cal1');
         document.getElementById('btn-cal-2').classList.toggle('active', calKey === 'cal2');
 
         const calId = calendars[calKey];
         const encodedId = encodeURIComponent(calId);
 
-        // Актуализиране на линковете
+        // Calendar dynamic URLs
         const googleUrl = `https://calendar.google.com/calendar/render?cid=${encodedId}`;
         const webcalUrl = `webcal://calendar.google.com/calendar/ical/${encodedId}/public/basic.ics`;
         const icsUrl = `https://calendar.google.com/calendar/ical/${encodedId}/public/basic.ics`;
-        // &wkst=2 sets the week start to Monday (1 = Sunday, 2 = Monday)
+        
+        // Note: &wkst=2 sets the week start to Monday (1 = Sunday, 2 = Monday)
         const embedUrl = `https://calendar.google.com/calendar/embed?src=${encodedId}&ctz=Europe%2FSofia&wkst=2`;
 
         document.getElementById('link-google').href = googleUrl;
@@ -295,22 +313,45 @@
         document.getElementById('link-ics').href = icsUrl;
         document.getElementById('calendar-iframe').src = embedUrl;
 
-        // Прегенериране на QR кодовете на живо
+        // Clear and regenerate QR codes for calendar links
         document.getElementById('qr-google').innerHTML = "";
         document.getElementById('qr-webcal').innerHTML = "";
         document.getElementById('qr-ics').innerHTML = "";
 
-        new QRCode(document.getElementById("qr-google"), { text: googleUrl, width: 130, height: 130 });
-        new QRCode(document.getElementById("qr-webcal"), { text: webcalUrl, width: 130, height: 130 });
-        new QRCode(document.getElementById("qr-ics"), { text: icsUrl, width: 130, height: 130 });
+        new QRCode(document.getElementById("qr-google"), { text: googleUrl, width: 120, height: 120 });
+        new QRCode(document.getElementById("qr-webcal"), { text: webcalUrl, width: 120, height: 120 });
+        new QRCode(document.getElementById("qr-ics"), { text: icsUrl, width: 120, height: 120 });
     }
 
-    // Езикови преводи
+    // Function to render 4th card QR code targeting the landing page URL itself
+    function renderPageQr() {
+        const currentUrl = window.location.href;
+        document.getElementById('qr-page').innerHTML = "";
+        new QRCode(document.getElementById("qr-page"), { text: currentUrl, width: 120, height: 120 });
+    }
+
+    // Copy current page link helper (iframe-safe fallback method)
+    function copyPageLink() {
+        const dummy = document.createElement('input');
+        document.body.appendChild(dummy);
+        dummy.value = window.location.href;
+        dummy.select();
+        document.execCommand('copy');
+        document.body.removeChild(dummy);
+
+        const btn = document.getElementById('btn-copy-page');
+        const origText = btn.innerText;
+        btn.innerText = (document.documentElement.lang === 'fr') ? "Lien copié !" : 
+                        (document.documentElement.lang === 'bg') ? "Копирано!" : "Copied!";
+        setTimeout(() => { btn.innerText = origText; }, 2000);
+    }
+
+    // Multilingual Translations
     const translations = {
         fr: {
             title: "Petanque Tournaments en Bulgarie - S'abonner et Synchroniser",
             mainHeading: "Petanque Tournaments en Bulgarie",
-            subHeading: "Abonnez-vous pour synchroniser automatiquement les événements.",
+            subHeading: "Abonnez-vous pour synchroniser automatiquement les événements sur votre téléphone ou ordinateur.",
             card1Title: "Google Agenda",
             card1Desc: "Ajoutez directement à votre compte Google personnel en un clic.",
             card1Btn: "Ajouter à Google",
@@ -320,13 +361,16 @@
             card3Title: "Télécharger le fichier .ICS",
             card3Desc: "Téléchargez un fichier statique pour importer manuellement.",
             card3Btn: "Télécharger .ICS",
+            card4Title: "Partager cette page",
+            card4Desc: "Scannez le QR code ou copiez le lien pour ouvrir cette page sur votre téléphone.",
+            card4Btn: "Copier le lien",
             previewTitle: "Aperçu en direct",
             footerText: "Page d'accès partagé du calendrier"
         },
         en: {
             title: "Petanque Tournaments in Bulgaria - Subscribe and Synchronise",
             mainHeading: "Petanque Tournaments in Bulgaria",
-            subHeading: "Subscribe to automatically sync events.",
+            subHeading: "Subscribe to automatically sync events to your phone or computer.",
             card1Title: "Google Calendar",
             card1Desc: "Add directly to your personal Google account with one click.",
             card1Btn: "Add to Google",
@@ -334,15 +378,18 @@
             card2Desc: "Auto-sync natively to iOS, macOS, or Outlook via iCal link.",
             card2Btn: "Subscribe (iCal)",
             card3Title: "Download .ICS File",
-            card3Desc: "Download a static file to import events manually.",
+            card3Desc: "Download a static file to import events manually into other apps.",
             card3Btn: "Download .ICS",
+            card4Title: "Share This Page",
+            card4Desc: "Scan the QR code or copy the link to open this landing page on your mobile device.",
+            card4Btn: "Copy Page Link",
             previewTitle: "Live preview",
             footerText: "Shared calendar access page"
         },
         bg: {
             title: "Петанк Турнири в България - Абониране и Синхронизиране",
             mainHeading: "Петанк Турнири в България",
-            subHeading: "Абонирайте се, за да поддържате събитията автоматично синхронизирани.",
+            subHeading: "Абонирайте се, за да поддържате събитията автоматично синхронизирани на телефона или компютъра си.",
             card1Title: "Google Календар",
             card1Desc: "Добавете директно към личния си Google профил с едно кликване.",
             card1Btn: "Добави в Google",
@@ -352,11 +399,15 @@
             card3Title: "Изтегляне на .ICS файл",
             card3Desc: "Изтеглете статичен файл за ръчно импортиране в друг софтуер.",
             card3Btn: "Изтегляне .ICS",
+            card4Title: "Споделете тази страница",
+            card4Desc: "Сканирайте QR кода или копирайте линка, за да отворите страницата на телефон.",
+            card4Btn: "Копирай линка",
             previewTitle: "Преглед на живо",
             footerText: "Страница за споделен достъп до календари"
         }
     };
 
+    // Detect browser language (defaults to 'en' if not matched)
     const userLang = (navigator.language || navigator.userLanguage || 'en').substring(0, 2).toLowerCase();
 
     if (translations[userLang]) {
@@ -377,14 +428,19 @@
         document.getElementById('card3-desc').innerText = t.card3Desc;
         document.getElementById('link-ics').innerText = t.card3Btn;
 
+        document.getElementById('card4-title').innerText = t.card4Title;
+        document.getElementById('card4-desc').innerText = t.card4Desc;
+        document.getElementById('btn-copy-page').innerText = t.card4Btn;
+
         document.getElementById('preview-title').innerText = t.previewTitle;
         document.getElementById('footer-text').innerText = t.footerText;
         
         document.documentElement.setAttribute('lang', userLang);
     }
 
-    // By default set cal1
+    // Initialize calendar and landing page QR code on load
     switchCalendar('cal1');
+    renderPageQr();
 </script>
 
 </body>
