@@ -341,12 +341,16 @@
 
         const btn = document.getElementById('btn-copy-page');
         const origText = btn.innerText;
-        btn.innerText = (document.documentElement.lang === 'fr') ? "Lien copié !" : 
-                        (document.documentElement.lang === 'bg') ? "Копирано!" : "Copied!";
+        const lang = document.documentElement.lang;
+        
+        btn.innerText = (lang === 'fr') ? "Lien copié !" : 
+                        (lang === 'bg') ? "Копирано!" : 
+                        (lang === 'sr') ? "Линк је копиран!" : "Copied!";
+                        
         setTimeout(() => { btn.innerText = origText; }, 2000);
     }
 
-    // Multilingual Translations
+    // Multilingual Translations (including Serbian)
     const translations = {
         fr: {
             title: "Petanque Tournaments en Bulgarie - S'abonner et Synchroniser",
@@ -404,6 +408,25 @@
             card4Btn: "Копирай линка",
             previewTitle: "Преглед на живо",
             footerText: "Страница за споделен достъп до календари"
+        },
+        sr: {
+            title: "Петанк Турнири у Бугарској - Претплата и Синк",
+            mainHeading: "Петанк Турнири у Бугарској",
+            subHeading: "Претплатите се да аутоматизовано синкронизујете догађаје на вашем телефону или рачунару.",
+            card1Title: "Google Календар",
+            card1Desc: "Додајте директно у ваш лични Google налог једним кликом.",
+            card1Btn: "Додај у Google",
+            card2Title: "Apple & Outlook (Уживо)",
+            card2Desc: "Аутоматско синкронизовање за iOS, macOS или Outlook преко iCal везе.",
+            card2Btn: "Претплати се (iCal)",
+            card3Title: "Преузимање .ICS фајла",
+            card3Desc: "Преузмите статичну датотеку за ручни увоз у други софтвер.",
+            card3Btn: "Преузми .ICS",
+            card4Title: "Подели ову страницу",
+            card4Desc: "Скенирајте QR код или копирајте везу да отворите страницу на мобилном.",
+            card4Btn: "Копирај везу",
+            previewTitle: "Преглед уживо",
+            footerText: "Страница за дељени приступ календарима"
         }
     };
 
