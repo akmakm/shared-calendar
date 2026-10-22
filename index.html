@@ -4,12 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title id="page-title">🇧🇬 Bulgaria Petanque Tournaments</title>
-    <!-- Reliable standalone library for generating QR codes dynamically -->
+    <!-- Standalone library for generating QR codes -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     
-    <!-- Firebase App (Core) SDK -->
+    <!-- Firebase App (Core) & Firestore SDKs -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <!-- Firebase Firestore SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <style>
@@ -291,7 +290,7 @@
             <a id="link-ics" href="#" target="_blank" class="btn">Изтегляне .ICS</a>
         </div>
 
-        <!-- 4. Share Web Page (Direct link to window.location.href) -->
+        <!-- 4. Share Web Page -->
         <div class="card">
             <div>
                 <h2 id="card4-title">Споделете тази страница</h2>
@@ -318,14 +317,20 @@
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-    // Automatically record visit info to Firestore collection "page_visits"
+    let visitDocRef = null;
+
+    // Log the page visit immediately with initial calendar selection
     db.collection("page_visits").add({
         timestamp: firebase.firestore.FieldValue.serverTimestamp(),
         userAgent: navigator.userAgent,
         language: navigator.language,
         screenResolution: `${window.screen.width}x${window.screen.height}`,
         referrer: document.referrer || "direct",
-        url: window.location.href
+        url: window.location.href,
+        calendarOpened: "Bulgaria (cal1)",
+        calendarSwitches: []
+    }).then(docRef => {
+        visitDocRef = docRef;
     }).catch(err => {
         console.error("Error writing visit to Firestore: ", err);
     });
@@ -337,6 +342,7 @@
     };
 
     let activeCalKey = 'cal1';
+    let initialLoad = true;
 
     function updateTabTitle() {
         const headingText = document.getElementById('main-heading').innerText;
@@ -345,6 +351,19 @@
     }
 
     function switchCalendar(calKey) {
+        const calName = (calKey === 'cal1') ? "Bulgaria (cal1)" : "World (cal2)";
+
+        // If the user actively switches tabs after initial load, record the switch event in Firestore
+        if (!initialLoad && visitDocRef) {
+            visitDocRef.update({
+                lastOpenedCalendar: calName,
+                calendarSwitches: firebase.firestore.FieldValue.arrayUnion({
+                    calendar: calName,
+                    time: new Date().toISOString()
+                })
+            }).catch(err => console.error("Error updating active calendar in Firestore: ", err));
+        }
+
         activeCalKey = calKey;
 
         document.getElementById('btn-cal-1').classList.toggle('active', calKey === 'cal1');
@@ -374,6 +393,7 @@
         new QRCode(document.getElementById("qr-ics"), { text: icsUrl, width: 120, height: 120 });
 
         updateTabTitle();
+        initialLoad = false;
     }
 
     function renderPageQr() {
