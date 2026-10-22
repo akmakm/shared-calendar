@@ -6,6 +6,12 @@
     <title id="page-title">🇧🇬 Bulgaria Petanque Tournaments</title>
     <!-- Reliable standalone library for generating QR codes dynamically -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    
+    <!-- Firebase App (Core) SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <!-- Firebase Firestore SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
     <style>
         :root {
             --primary: #1a73e8;
@@ -302,7 +308,29 @@
 </div>
 
 <script>
-    // Calendar Google IDs
+    // --- Firebase Initialization & Visitor Logging ---
+    const firebaseConfig = {
+        apiKey: "AIzaSyCR-0xoLsSfe-rhaGilNzlll-dA2NwhjW0",
+        projectId: "ptanque-pal",
+        storageBucket: "ptanque-pal.firebasestorage.app"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    // Automatically record visit info to Firestore collection "page_visits"
+    db.collection("page_visits").add({
+        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+        userAgent: navigator.userAgent,
+        language: navigator.language,
+        screenResolution: `${window.screen.width}x${window.screen.height}`,
+        referrer: document.referrer || "direct",
+        url: window.location.href
+    }).catch(err => {
+        console.error("Error writing visit to Firestore: ", err);
+    });
+
+    // --- Calendar Google IDs ---
     const calendars = {
         cal1: "c_40badfc66bb08e57ff6be29b6a3350909bec136dd4ac957c0cae51b87ab41291@group.calendar.google.com",
         cal2: "c_999755f1a46e47b62759bc0652928fe68deb0d75cd7241b11c38cc43123808cc@group.calendar.google.com"
@@ -310,7 +338,6 @@
 
     let activeCalKey = 'cal1';
 
-    // Updates document title tab hover tooltip to reflect current mainHeading and active icon
     function updateTabTitle() {
         const headingText = document.getElementById('main-heading').innerText;
         const icon = (activeCalKey === 'cal1') ? '🇧🇬' : '🌐';
@@ -320,22 +347,17 @@
     function switchCalendar(calKey) {
         activeCalKey = calKey;
 
-        // Toggle active button style
         document.getElementById('btn-cal-1').classList.toggle('active', calKey === 'cal1');
         document.getElementById('btn-cal-2').classList.toggle('active', calKey === 'cal2');
 
         const calId = calendars[calKey];
         const encodedId = encodeURIComponent(calId);
 
-        // Calendar dynamic URLs
         const googleUrl = `https://calendar.google.com/calendar/render?cid=${encodedId}`;
         const webcalUrl = `webcal://calendar.google.com/calendar/ical/${encodedId}/public/basic.ics`;
         const icsUrl = `https://calendar.google.com/calendar/ical/${encodedId}/public/basic.ics`;
         
-        // Color configuration: Green (%230D7813) for Bulgaria, Standard Blue (%232952A3) for World
         const calColor = (calKey === 'cal1') ? '%230D7813' : '%232952A3';
-        
-        // Embed URL with week start on Monday (&wkst=2) and themed color
         const embedUrl = `https://calendar.google.com/calendar/embed?src=${encodedId}&ctz=Europe%2FSofia&wkst=2&color=${calColor}`;
 
         document.getElementById('link-google').href = googleUrl;
@@ -343,7 +365,6 @@
         document.getElementById('link-ics').href = icsUrl;
         document.getElementById('calendar-iframe').src = embedUrl;
 
-        // Clear and regenerate QR codes for calendar links
         document.getElementById('qr-google').innerHTML = "";
         document.getElementById('qr-webcal').innerHTML = "";
         document.getElementById('qr-ics').innerHTML = "";
@@ -352,18 +373,15 @@
         new QRCode(document.getElementById("qr-webcal"), { text: webcalUrl, width: 120, height: 120 });
         new QRCode(document.getElementById("qr-ics"), { text: icsUrl, width: 120, height: 120 });
 
-        // Refresh tab hover title
         updateTabTitle();
     }
 
-    // Function to render 4th card QR code targeting the landing page URL itself
     function renderPageQr() {
         const currentUrl = window.location.href;
         document.getElementById('qr-page').innerHTML = "";
         new QRCode(document.getElementById("qr-page"), { text: currentUrl, width: 120, height: 120 });
     }
 
-    // Copy current page link helper (iframe-safe fallback method)
     function copyPageLink() {
         const dummy = document.createElement('input');
         document.body.appendChild(dummy);
@@ -383,7 +401,6 @@
         setTimeout(() => { btn.innerText = origText; }, 2000);
     }
 
-    // Multilingual Translations (including Serbian)
     const translations = {
         fr: {
             title: "Petanque Tournaments en Bulgarie - S'abonner et Synchroniser",
@@ -463,12 +480,10 @@
         }
     };
 
-    // Detect browser language (defaults to 'en' if not matched)
     const userLang = (navigator.language || navigator.userLanguage || 'en').substring(0, 2).toLowerCase();
 
     if (translations[userLang]) {
         const t = translations[userLang];
-        document.getElementById('page-title').innerText = t.title;
         document.getElementById('main-heading').innerText = t.mainHeading;
         document.getElementById('sub-heading').innerText = t.subHeading;
         
@@ -494,7 +509,6 @@
         document.documentElement.setAttribute('lang', userLang);
     }
 
-    // Initialize calendar and landing page QR code on load
     switchCalendar('cal1');
     renderPageQr();
 </script>
