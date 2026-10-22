@@ -319,21 +319,35 @@
 
     let visitDocRef = null;
 
-    // Log the page visit immediately with initial calendar selection
-    db.collection("page_visits").add({
-        timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-        userAgent: navigator.userAgent,
-        language: navigator.language,
-        screenResolution: `${window.screen.width}x${window.screen.height}`,
-        referrer: document.referrer || "direct",
-        url: window.location.href,
-        calendarOpened: "Bulgaria (cal1)",
-        calendarSwitches: []
-    }).then(docRef => {
-        visitDocRef = docRef;
-    }).catch(err => {
-        console.error("Error writing visit to Firestore: ", err);
-    });
+    // Fetch IP-based location and log visit with region/address details
+    fetch('https://ipapi.co/json/')
+        .then(response => response.json())
+        .catch(() => ({})) // Fallback if network/adblock blocks geo lookup
+        .then(geoData => {
+            return db.collection("page_visits").add({
+                timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                userAgent: navigator.userAgent,
+                language: navigator.language,
+                timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                screenResolution: `${window.screen.width}x${window.screen.height}`,
+                referrer: document.referrer || "direct",
+                url: window.location.href,
+                // Client location/region fields
+                ipAddress: geoData.ip || "unknown",
+                country: geoData.country_name || "unknown",
+                region: geoData.region || "unknown",
+                city: geoData.city || "unknown",
+                postalCode: geoData.postal || "unknown",
+                calendarOpened: "Bulgaria (cal1)",
+                calendarSwitches: []
+            });
+        })
+        .then(docRef => {
+            if (docRef) visitDocRef = docRef;
+        })
+        .catch(err => {
+            console.error("Error recording visit to Firestore: ", err);
+        });
 
     // --- Calendar Google IDs ---
     const calendars = {
@@ -353,7 +367,6 @@
     function switchCalendar(calKey) {
         const calName = (calKey === 'cal1') ? "Bulgaria (cal1)" : "World (cal2)";
 
-        // If the user actively switches tabs after initial load, record the switch event in Firestore
         if (!initialLoad && visitDocRef) {
             visitDocRef.update({
                 lastOpenedCalendar: calName,
