@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title id="page-title">Bulgaria Petanque Tournaments</title>
-    <!-- Standalone QR Code Generator Library -->
+    <title id="page-title">🇧🇬 Bulgaria Petanque Tournaments</title>
+    <!-- Reliable standalone library for generating QR codes dynamically -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
         :root {
@@ -45,7 +45,6 @@
             font-size: 2rem;
             color: var(--text-main);
             margin-bottom: 8px;
-            font-weight: 700;
         }
 
         header p {
@@ -60,7 +59,7 @@
             border-radius: 12px;
             padding: 20px;
             margin-bottom: 32px;
-            box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
         }
 
         .embed-header {
@@ -75,77 +74,61 @@
         .embed-section h2 {
             font-size: 1.25rem;
             margin: 0;
-            font-weight: 600;
         }
 
-        /* Calendar Toggle Switch */
+        /* Calendar Toggle Controls */
         .calendar-toggle {
             display: flex;
-            background: #eef1f5;
+            background: var(--bg);
             border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 4px;
-            gap: 6px;
+            border-radius: 8px;
+            padding: 3px;
+            gap: 4px;
         }
 
         .toggle-btn {
             background: transparent;
             border: 2px solid transparent;
-            padding: 8px 16px;
-            font-size: 0.9rem;
-            font-weight: 600;
+            padding: 6px 12px;
+            font-size: 0.85rem;
+            font-weight: 500;
             color: var(--text-sub);
             cursor: pointer;
-            border-radius: 8px;
-            transition: all 0.25s ease;
+            border-radius: 6px;
+            transition: all 0.2s;
             display: flex;
             align-items: center;
-            justify-content: center;
-            gap: 8px;
+            gap: 6px;
         }
 
-        /* Bulgarian Tricolor Styled Toggle Button (White - Green - Red) */
+        /* Bulgarian Tricolor Styled Toggle Button */
         .toggle-btn-bg {
             position: relative;
             background: #ffffff;
-            color: #202124;
-            border: 1px solid #d0d5dd;
         }
 
-        /* Active Bulgarian Flag Tricolor Style */
         .toggle-btn-bg.active {
-            /* 3 equal stripes: White, Green (#00966E), Red (#D62612) */
-            background: linear-gradient(180deg, 
-                #ffffff 0%, #ffffff 33.3%, 
-                #00966e 33.3%, #00966e 66.6%, 
-                #d62612 66.6%, #d62612 100%);
+            background: linear-gradient(180deg, #ffffff 33%, #00966e 33%, #00966e 66%, #d62612 66%);
             color: #ffffff;
-            font-weight: 700;
-            border: 1px solid #00000022;
-            /* Text stroke shadow to ensure white/green/red backdrop readability */
-            text-shadow: 0px 1px 3px rgba(0, 0, 0, 0.9), 0px 0px 2px rgba(0,0,0,0.8);
-            box-shadow: 0 2px 5px rgba(0,0,0,0.25);
+            font-weight: 600;
+            text-shadow: 0px 1px 2px rgba(0, 0, 0, 0.8);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+            border-radius: 6px;
         }
 
-        .toggle-btn-world {
-            min-width: 44px;
-        }
-
-        .toggle-btn-world.active {
+        .toggle-btn.active:not(.toggle-btn-bg) {
             background: var(--card-bg);
             color: var(--primary);
-            box-shadow: 0 1px 3px rgba(0,0,0,0.15);
-            border-color: var(--primary);
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
         }
 
         .iframe-container {
             position: relative;
             width: 100%;
-            height: 520px;
+            height: 480px;
             border-radius: 8px;
             overflow: hidden;
             border: 1px solid var(--border);
-            background: #fafafa;
         }
 
         iframe {
@@ -154,7 +137,7 @@
             border: 0;
         }
 
-        /* Cards Responsive Layout Grid */
+        /* Cards Grid Layout */
         .cards-grid {
             display: grid;
             grid-template-columns: 1fr;
@@ -189,12 +172,6 @@
             flex-direction: column;
             justify-content: space-between;
             box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }
-
-        .card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
         }
 
         @media (min-width: 640px) {
@@ -206,7 +183,6 @@
         .card h2 {
             font-size: 1.1rem;
             margin-bottom: 8px;
-            font-weight: 600;
         }
 
         .card p {
@@ -238,7 +214,7 @@
             border-radius: 6px;
             font-weight: 500;
             font-size: 0.875rem;
-            transition: background-color 0.2s ease;
+            transition: background-color 0.2s;
             cursor: pointer;
             border: none;
             width: 100%;
@@ -252,7 +228,7 @@
             text-align: center;
             margin-top: 32px;
             color: var(--text-sub);
-            font-size: 0.85rem;
+            font-size: 0.8rem;
         }
     </style>
 </head>
@@ -269,14 +245,8 @@
         <div class="embed-header">
             <h2 id="preview-title">Преглед на живо</h2>
             <div class="calendar-toggle">
-                <!-- Bulgaria button styled with Tricolor Flag -->
-                <button id="btn-cal-1" class="toggle-btn toggle-btn-bg active" onclick="switchCalendar('cal1')">
-                    <span>Bulgaria</span> <span>🇧🇬</span>
-                </button>
-                <!-- World button with icon only -->
-                <button id="btn-cal-2" class="toggle-btn toggle-btn-world" onclick="switchCalendar('cal2')" title="World Calendar">
-                    <span>🌐</span>
-                </button>
+                <button id="btn-cal-1" class="toggle-btn toggle-btn-bg active" onclick="switchCalendar('cal1')">Bulgaria <span>🇧🇬</span></button>
+                <button id="btn-cal-2" class="toggle-btn" onclick="switchCalendar('cal2')"><span>🌐</span></button>
             </div>
         </div>
         <div class="iframe-container">
@@ -284,9 +254,8 @@
         </div>
     </div>
 
-    <!-- 4 Responsive Subscription / Share Cards -->
     <div class="cards-grid">
-        <!-- Card 1: Google Calendar -->
+        <!-- 1. Google Calendar Direct -->
         <div class="card">
             <div>
                 <h2 id="card1-title">Google Календар</h2>
@@ -296,7 +265,7 @@
             <a id="link-google" href="#" target="_blank" class="btn">Добави в Google</a>
         </div>
 
-        <!-- Card 2: Apple & Outlook (iCal Auto-sync) -->
+        <!-- 2. Cross-Platform Auto-Sync (Webcal for Apple / Outlook) -->
         <div class="card">
             <div>
                 <h2 id="card2-title">Apple & Outlook (На живо)</h2>
@@ -306,7 +275,7 @@
             <a id="link-webcal" href="#" class="btn">Абониране (iCal)</a>
         </div>
 
-        <!-- Card 3: Download .ICS file -->
+        <!-- 3. Standard ICS File Download -->
         <div class="card">
             <div>
                 <h2 id="card3-title">Изтегляне на .ICS файл</h2>
@@ -316,7 +285,7 @@
             <a id="link-ics" href="#" target="_blank" class="btn">Изтегляне .ICS</a>
         </div>
 
-        <!-- Card 4: Share Landing Page -->
+        <!-- 4. Share Web Page (Direct link to window.location.href) -->
         <div class="card">
             <div>
                 <h2 id="card4-title">Споделете тази страница</h2>
@@ -333,38 +302,48 @@
 </div>
 
 <script>
-    // Public Calendar Google Identifiers
+    // Calendar Google IDs
     const calendars = {
         cal1: "c_40badfc66bb08e57ff6be29b6a3350909bec136dd4ac957c0cae51b87ab41291@group.calendar.google.com",
         cal2: "c_999755f1a46e47b62759bc0652928fe68deb0d75cd7241b11c38cc43123808cc@group.calendar.google.com"
     };
 
+    let activeCalKey = 'cal1';
+
+    // Updates document title tab hover tooltip to reflect current mainHeading and active icon
+    function updateTabTitle() {
+        const headingText = document.getElementById('main-heading').innerText;
+        const icon = (activeCalKey === 'cal1') ? '🇧🇬' : '🌐';
+        document.title = `${icon} ${headingText}`;
+    }
+
     function switchCalendar(calKey) {
-        // Toggle active button style states
+        activeCalKey = calKey;
+
+        // Toggle active button style
         document.getElementById('btn-cal-1').classList.toggle('active', calKey === 'cal1');
         document.getElementById('btn-cal-2').classList.toggle('active', calKey === 'cal2');
 
         const calId = calendars[calKey];
         const encodedId = encodeURIComponent(calId);
 
-        // Dynamic links for calendars
+        // Calendar dynamic URLs
         const googleUrl = `https://calendar.google.com/calendar/render?cid=${encodedId}`;
         const webcalUrl = `webcal://calendar.google.com/calendar/ical/${encodedId}/public/basic.ics`;
         const icsUrl = `https://calendar.google.com/calendar/ical/${encodedId}/public/basic.ics`;
         
-        // Bulgarian green theme (%230D7813) for BG calendar, Standard blue (%232952A3) for World calendar
+        // Color configuration: Green (%230D7813) for Bulgaria, Standard Blue (%232952A3) for World
         const calColor = (calKey === 'cal1') ? '%230D7813' : '%232952A3';
         
-        // Google Embed Calendar URL: wkst=2 (Monday start), Sofia timezone
+        // Embed URL with week start on Monday (&wkst=2) and themed color
         const embedUrl = `https://calendar.google.com/calendar/embed?src=${encodedId}&ctz=Europe%2FSofia&wkst=2&color=${calColor}`;
 
-        // Update card action button targets
         document.getElementById('link-google').href = googleUrl;
         document.getElementById('link-webcal').href = webcalUrl;
         document.getElementById('link-ics').href = icsUrl;
         document.getElementById('calendar-iframe').src = embedUrl;
 
-        // Render dynamic QR Codes for calendar actions
+        // Clear and regenerate QR codes for calendar links
         document.getElementById('qr-google').innerHTML = "";
         document.getElementById('qr-webcal').innerHTML = "";
         document.getElementById('qr-ics').innerHTML = "";
@@ -372,16 +351,19 @@
         new QRCode(document.getElementById("qr-google"), { text: googleUrl, width: 120, height: 120 });
         new QRCode(document.getElementById("qr-webcal"), { text: webcalUrl, width: 120, height: 120 });
         new QRCode(document.getElementById("qr-ics"), { text: icsUrl, width: 120, height: 120 });
+
+        // Refresh tab hover title
+        updateTabTitle();
     }
 
-    // Render 4th card QR code pointing to current page URL (window.location.href)
+    // Function to render 4th card QR code targeting the landing page URL itself
     function renderPageQr() {
         const currentUrl = window.location.href;
         document.getElementById('qr-page').innerHTML = "";
         new QRCode(document.getElementById("qr-page"), { text: currentUrl, width: 120, height: 120 });
     }
 
-    // Clipboard copy helper using execCommand for sandbox iframe compatibility
+    // Copy current page link helper (iframe-safe fallback method)
     function copyPageLink() {
         const dummy = document.createElement('input');
         document.body.appendChild(dummy);
@@ -392,7 +374,7 @@
 
         const btn = document.getElementById('btn-copy-page');
         const origText = btn.innerText;
-        const lang = document.documentElement.lang || 'en';
+        const lang = document.documentElement.lang;
         
         btn.innerText = (lang === 'fr') ? "Lien copié !" : 
                         (lang === 'bg') ? "Копирано!" : 
@@ -401,7 +383,7 @@
         setTimeout(() => { btn.innerText = origText; }, 2000);
     }
 
-    // Multilingual Translations Dictionary (Bulgarian, English, French, Serbian)
+    // Multilingual Translations (including Serbian)
     const translations = {
         fr: {
             title: "Petanque Tournaments en Bulgarie - S'abonner et Synchroniser",
@@ -481,8 +463,8 @@
         }
     };
 
-    // Auto-detect browser language
-    const userLang = (navigator.language || navigator.userLanguage || 'bg').substring(0, 2).toLowerCase();
+    // Detect browser language (defaults to 'en' if not matched)
+    const userLang = (navigator.language || navigator.userLanguage || 'en').substring(0, 2).toLowerCase();
 
     if (translations[userLang]) {
         const t = translations[userLang];
@@ -512,7 +494,7 @@
         document.documentElement.setAttribute('lang', userLang);
     }
 
-    // Initialize initial calendar state and share QR code
+    // Initialize calendar and landing page QR code on load
     switchCalendar('cal1');
     renderPageQr();
 </script>
