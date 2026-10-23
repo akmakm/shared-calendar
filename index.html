@@ -4,238 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title id="page-title">🇧🇬 Bulgaria Petanque Tournaments</title>
+    
+    <!-- External Stylesheet -->
+    <link rel="stylesheet" href="style.css">
+
     <!-- Standalone library for generating QR codes -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     
     <!-- Firebase App (Core) & Firestore SDKs -->
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-
-    <style>
-        :root {
-            --primary: #1a73e8;
-            --primary-hover: #1557b0;
-            --bg: #f8f9fa;
-            --card-bg: #ffffff;
-            --text-main: #202124;
-            --text-sub: #5f6368;
-            --border: #dadce0;
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-        }
-
-        body {
-            background-color: var(--bg);
-            color: var(--text-main);
-            line-height: 1.5;
-            padding: 24px 16px;
-        }
-
-        .container {
-            max-width: 1100px;
-            margin: 0 auto;
-        }
-
-        header {
-            text-align: center;
-            margin-bottom: 24px;
-        }
-
-        header h1 {
-            font-size: 2rem;
-            color: var(--text-main);
-            margin-bottom: 8px;
-        }
-
-        header p {
-            color: var(--text-sub);
-            font-size: 1rem;
-        }
-
-        /* Live Calendar Embed Section */
-        .embed-section {
-            background: var(--card-bg);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 32px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-        }
-
-        .embed-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 16px;
-            flex-wrap: wrap;
-            gap: 12px;
-        }
-
-        .embed-section h2 {
-            font-size: 1.25rem;
-            margin: 0;
-        }
-
-        /* Calendar Toggle Controls */
-        .calendar-toggle {
-            display: flex;
-            background: var(--bg);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 3px;
-            gap: 4px;
-        }
-
-        .toggle-btn {
-            background: transparent;
-            border: 2px solid transparent;
-            padding: 6px 12px;
-            font-size: 0.85rem;
-            font-weight: 500;
-            color: var(--text-sub);
-            cursor: pointer;
-            border-radius: 6px;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        /* Bulgarian Tricolor Styled Toggle Button */
-        .toggle-btn-bg {
-            position: relative;
-            background: #ffffff;
-        }
-
-        .toggle-btn-bg.active {
-            background: linear-gradient(180deg, #ffffff 33%, #00966e 33%, #00966e 66%, #d62612 66%);
-            color: #ffffff;
-            font-weight: 600;
-            text-shadow: 0px 1px 2px rgba(0, 0, 0, 0.8);
-            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-            border-radius: 6px;
-        }
-
-        .toggle-btn.active:not(.toggle-btn-bg) {
-            background: var(--card-bg);
-            color: var(--primary);
-            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
-        }
-
-        .iframe-container {
-            position: relative;
-            width: 100%;
-            height: 480px;
-            border-radius: 8px;
-            overflow: hidden;
-            border: 1px solid var(--border);
-        }
-
-        iframe {
-            width: 100%;
-            height: 100%;
-            border: 0;
-        }
-
-        /* Cards Grid Layout */
-        .cards-grid {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 20px;
-            justify-items: center;
-            margin-bottom: 32px;
-        }
-
-        @media (min-width: 640px) {
-            .cards-grid {
-                grid-template-columns: repeat(2, 1fr);
-                justify-items: stretch;
-            }
-        }
-
-        @media (min-width: 1024px) {
-            .cards-grid {
-                grid-template-columns: repeat(4, 1fr);
-                justify-items: stretch;
-            }
-        }
-
-        .card {
-            background: var(--card-bg);
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 20px 16px;
-            text-align: center;
-            width: 100%;
-            max-width: 400px;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-        }
-
-        @media (min-width: 640px) {
-            .card {
-                max-width: none;
-            }
-        }
-
-        .card h2 {
-            font-size: 1.1rem;
-            margin-bottom: 8px;
-        }
-
-        .card p {
-            font-size: 0.85rem;
-            color: var(--text-sub);
-            margin-bottom: 16px;
-            min-height: 48px;
-        }
-
-        .qr-wrapper {
-            background: #fff;
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 10px;
-            display: inline-flex;
-            justify-content: center;
-            align-items: center;
-            margin: 0 auto 16px auto;
-            width: 140px;
-            height: 140px;
-        }
-
-        .btn {
-            display: inline-block;
-            background-color: var(--primary);
-            color: white;
-            text-decoration: none;
-            padding: 10px 14px;
-            border-radius: 6px;
-            font-weight: 500;
-            font-size: 0.875rem;
-            transition: background-color 0.2s;
-            cursor: pointer;
-            border: none;
-            width: 100%;
-        }
-
-        .btn:hover {
-            background-color: var(--primary-hover);
-        }
-
-        footer {
-            text-align: center;
-            margin-top: 32px;
-            color: var(--text-sub);
-            font-size: 0.8rem;
-        }
-    </style>
 </head>
 <body>
 
@@ -309,7 +87,7 @@
 <script>
     // --- Firebase Initialization & Visitor Logging ---
     const firebaseConfig = {
-        apiKey: "AIzaSyCR-0xoLsSfe-rhaGilNzlll-dA2NwhjW0",
+        apiKey: "YOUR_RESTRICTED_API_KEY_HERE",
         projectId: "ptanque-pal",
         storageBucket: "ptanque-pal.firebasestorage.app"
     };
@@ -322,7 +100,7 @@
     // Fetch IP-based location and log visit with region/address details
     fetch('https://ipapi.co/json/')
         .then(response => response.json())
-        .catch(() => ({})) // Fallback if network/adblock blocks geo lookup
+        .catch(() => ({}))
         .then(geoData => {
             return db.collection("page_visits").add({
                 timestamp: firebase.firestore.FieldValue.serverTimestamp(),
@@ -332,7 +110,6 @@
                 screenResolution: `${window.screen.width}x${window.screen.height}`,
                 referrer: document.referrer || "direct",
                 url: window.location.href,
-                // Client location/region fields
                 ipAddress: geoData.ip || "unknown",
                 country: geoData.country_name || "unknown",
                 region: geoData.region || "unknown",
