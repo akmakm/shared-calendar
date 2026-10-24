@@ -49,7 +49,7 @@
     </div>
 </div>
 
-<!-- Google Translate Integration Script -->
+<!-- Google Translate Initialization Script -->
 <script type="text/javascript">
 function googleTranslateElementInit() {
     new google.translate.TranslateElement({
@@ -62,67 +62,8 @@ function googleTranslateElementInit() {
 </script>
 <script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
 
-<!-- Interactive Assistant Logic -->
-<script>
-const chatMessages = document.getElementById('chat-messages');
-const userInput = document.getElementById('user-input');
-
-function handleKeyDown(e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendMessage();
-    }
-}
-
-function sendQuickPrompt(promptText) {
-    userInput.value = promptText;
-    sendMessage();
-}
-
-function sendMessage() {
-    const text = userInput.value.trim();
-    if (!text) return;
-
-    appendMessage(text, 'user');
-    userInput.value = '';
-    chatMessages.scrollTop = chatMessages.scrollHeight;
-
-    setTimeout(() => {
-        const reply = getBotReply(text);
-        appendMessage(reply, 'bot');
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-    }, 400);
-}
-
-function appendMessage(content, sender) {
-    const msgDiv = document.createElement('div');
-    msgDiv.className = `message ${sender}`;
-    msgDiv.textContent = content;
-    chatMessages.appendChild(msgDiv);
-}
-
-function getBotReply(query) {
-    const q = query.toLowerCase();
-
-    if (q.includes('distance') || q.includes('cochonnet') || q.includes('target') || q.includes('jack')) {
-        return "Official FIPJP Rule: For standard adult competitions, the cochonnet must be thrown between 6 meters and 10 meters from the throwing circle, keeping at least 1 meter away from any obstacle or boundary.";
-    } 
-    if (q.includes('score') || q.includes('point') || q.includes('win')) {
-        return "Scoring: The team with the boule closest to the cochonnet scores points. They receive 1 point for each boule closer to the cochonnet than the opponent's best boule. Games are played to 13 points.";
-    } 
-    if (q.includes('equidistant') || q.includes('equal') || q.includes('same distance') || q.includes('tie')) {
-        return "If the closest boules belonging to opposing teams are equidistant from the cochonnet: If both teams have thrown all boules, the end is null (0 points scored). If boules remain, the team that threw last throws again.";
-    } 
-    if (q.includes('calendar') || q.includes('sync') || q.includes('ical') || q.includes('google') || q.includes('subscribe')) {
-        return "To synchronize calendars: Click 'Subscribe (iCal/Webcal)' on the main page for live updating feeds on iOS, Mac, or Outlook. For Google Calendar, use the direct Google Calendar sync button.";
-    } 
-    if (q.includes('circle') || q.includes('foot') || q.includes('feet')) {
-        return "The throwing circle must measure between 35cm and 50cm in diameter. Players must keep both feet fully inside the circle on the ground until their boule touches the terrain.";
-    }
-
-    return "Thanks for your question! I cover rules on cochonnet distances, equal-distance measurements, scoring, circle requirements, and calendar sync. Try picking one of the quick options above!";
-}
-</script>
+<!-- External Bot Logic Script -->
+<script type="module" src="faq-bot.js"></script>
 
 </body>
 </html>
