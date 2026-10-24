@@ -1,6 +1,6 @@
 // Centralized Firebase Configuration using 5anque / ptanque-pal project
 const firebaseConfig = {
-    apiKey: "YOUR_RESTRICTED_API_KEY_HERE",
+    apiKey: "AIzaSyAXbL_1DO9T7gPba3VgfscTh2ymK87S7jU",
     projectId: "ptanque-pal",
     storageBucket: "ptanque-pal.firebasestorage.app"
 };
