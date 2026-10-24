@@ -1,13 +1,4 @@
-// --- Firebase Initialization & Visitor Logging ---
-// Replace YOUR_RESTRICTED_API_KEY_HERE with your regenerated API key (restricted by HTTP Referrer in Google Cloud Console)
-const firebaseConfig = {
-    apiKey: "YOUR_RESTRICTED_API_KEY_HERE",
-    projectId: "ptanque-pal",
-    storageBucket: "ptanque-pal.firebasestorage.app"
-};
-
-firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
+import { db } from "./firebase-config.js";
 
 let visitDocRef = null;
 
