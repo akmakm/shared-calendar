@@ -1,7 +1,12 @@
 import { db } from "./firebase-config.js";
 
-const chatMessages = document.getElementById('chat-messages');
-const userInput = document.getElementById('user-input');
+// Safe helper to fetch DOM elements dynamically when actions occur
+function getElements() {
+    return {
+        chatMessages: document.getElementById('chat-messages'),
+        userInput: document.getElementById('user-input')
+    };
+}
 
 window.handleKeyDown = function(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -12,13 +17,19 @@ window.handleKeyDown = function(e) {
 
 window.sendQuickPrompt = function(promptText) {
     logFaqError("sendQuickPrompt","promptText="+promptText);
+    const { userInput } = getElements();
+    if (!userInput) return;
+    
     userInput.value = promptText;
     window.sendMessage();
 }
 
 window.sendMessage = async function() {
+    const { chatMessages, userInput } = getElements();
+    logFaqError("sendMessage","userInput="+userInput.value.trim());
+    if (!userInput || !chatMessages) return;
+
     const text = userInput.value.trim();
-    logFaqError("sendMessage","text="+text);
     if (!text) return;
 
     appendMessage(text, 'user');
@@ -29,7 +40,9 @@ window.sendMessage = async function() {
 
     try {
         const replyData = await findBestFaqMatch(text);
-        document.getElementById(loadingId).remove();
+        
+        const loadingElem = document.getElementById(loadingId);
+        if (loadingElem) loadingElem.remove();
 
         appendMessage(replyData.answer, 'bot');
 
@@ -42,10 +55,12 @@ window.sendMessage = async function() {
         }
     } catch (error) {
         console.error("Error fetching FAQ from Firestore:", error);
-        document.getElementById(loadingId).remove();
+        const loadingElem = document.getElementById(loadingId);
+        if (loadingElem) loadingElem.remove();
+        
         appendMessage("Sorry, I encountered an issue connecting to the knowledge base. Please try again.", 'bot');
 
-        // Log the error to the new 'error_logs' Firestore collection
+        // Log the actual error to the 'error_logs' Firestore collection
         logFaqError(error, { query: text, action: "sendMessage" });
     }
 
@@ -53,6 +68,9 @@ window.sendMessage = async function() {
 }
 
 function appendMessage(content, sender) {
+    const { chatMessages } = getElements();
+    if (!chatMessages) return null;
+
     const msgDiv = document.createElement('div');
     msgDiv.className = `message ${sender.includes('loading') ? 'bot' : sender}`;
     msgDiv.id = 'msg-' + Math.random().toString(36).substring(2, 9);
@@ -104,7 +122,6 @@ async function findBestFaqMatch(query) {
 
         return bestMatch;
     } catch (error) {
-        // Log query matching errors specifically
         logFaqError(error, { query, action: "findBestFaqMatch" });
         throw error;
     }
@@ -118,7 +135,6 @@ function cleanAndTokenize(text) {
                .filter(word => word.length > 1 && !stopWords.has(word));
 }
 
-// Dedicated helper to record exceptions into the 'error_logs' collection
 async function logFaqError(error, additionalContext = {}) {
     try {
         await db.collection("error_logs").add({
