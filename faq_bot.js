@@ -11,12 +11,14 @@ window.handleKeyDown = function(e) {
 }
 
 window.sendQuickPrompt = function(promptText) {
+    logFaqError("sendQuickPrompt","promptText="+promptText);
     userInput.value = promptText;
     window.sendMessage();
 }
 
 window.sendMessage = async function() {
     const text = userInput.value.trim();
+    logFaqError("sendMessage","text="+text);
     if (!text) return;
 
     appendMessage(text, 'user');
