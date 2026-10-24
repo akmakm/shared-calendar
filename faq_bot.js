@@ -1,25 +1,8 @@
-// Import Firebase modules
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, getDocs, doc, updateDoc, increment } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-
-// Your Firebase configuration (update with your project details if needed)
-const firebaseConfig = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_AUTH_DOMAIN",
-    projectId: "5anque", // Using your 5anque project
-    storageBucket: "YOUR_STORAGE_BUCKET",
-    messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
-    appId: "YOUR_APP_ID"
-};
-
-// Initialize Firebase
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
+import { db } from "./firebase-config.js";
 
 const chatMessages = document.getElementById('chat-messages');
 const userInput = document.getElementById('user-input');
 
-// Expose event handlers globally so inline HTML onclick attributes can reach them
 window.handleKeyDown = function(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
@@ -48,10 +31,10 @@ window.sendMessage = async function() {
 
         appendMessage(replyData.answer, 'bot');
 
+        // Increment display_count in /faq_knowledge_base
         if (replyData.docId) {
-            const docRef = doc(db, "faq_knowledge_base", replyData.docId);
-            await updateDoc(docRef, {
-                display_count: increment(1)
+            await db.collection("faq_knowledge_base").doc(replyData.docId).update({
+                display_count: firebase.firestore.FieldValue.increment(1)
             });
             console.log(`Incremented display_count for document: ${replyData.docId}`);
         }
@@ -73,10 +56,9 @@ function appendMessage(content, sender) {
     return msgDiv.id;
 }
 
-// Keyword-similarity scoring engine against Firestore FAQ documents
 async function findBestFaqMatch(query) {
     const queryTokens = cleanAndTokenize(query);
-    const querySnapshot = await getDocs(collection(db, "faq_knowledge_base"));
+    const querySnapshot = await db.collection("faq_knowledge_base").get();
     
     let bestMatch = {
         answer: "Thanks for your question! I couldn't find a direct match in our database. Try asking about cochonnet distances, scoring, or calendar sync.",
