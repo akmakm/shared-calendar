@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title id="faq-page-title">FAQ & Petanque Rules - Bulgaria Petanque Tournaments</title>
+    
+    <!-- Shared Stylesheet with Cache-Busting Versioning -->
+    <link rel="stylesheet" href="style.css?v=2">
+</head>
+<body>
+
+<div class="container">
+    <div class="nav-back-bar">
+        <a href="index.html" class="btn" style="width: auto; padding: 8px 16px;">← <span id="lbl-back">Back to Calendar</span></a>
+    </div>
+
+    <header>
+        <h1 id="faq-title">Frequently Asked Questions</h1>
+        <p>Петанк, правила, сложни ситуации</p>
+    </header>
+
+    <!-- FAQ List Section -->
+    <div class="faq-section" id="faq-container">
+        <!-- Dynamic FAQ items rendered here based on browser language -->
+    </div>
+
+    <!-- Client-side Interactive Chatbot Section -->
+    <div class="chat-card">
+        <div class="chat-header">
+            <div class="chat-header-info">
+                <div class="chat-avatar">🎯</div>
+                <div class="chat-title">
+                    <h2 id="chat-heading">Petanque Assistant Bot</h2>
+                    <p id="chat-sub">Ask about rules, scoring, complex situations, or calendar sync</p>
+                </div>
+            </div>
+            <button type="button" class="chat-clear-btn" onclick="clearChatHistory()" id="lbl-clear">Clear</button>
+        </div>
+
+        <div class="chat-window" id="chat-window">
+            <div class="chat-msg bot" id="bot-welcome">
+                Hello! I am your Petanque Assistant. Select a question below or type your question about rules and calendar setup!
+            </div>
+        </div>
+
+        <div class="quick-prompts" id="quick-prompts">
+            <!-- Dynamic prompt buttons inserted here -->
+        </div>
+
+        <form class="chat-input-row" onsubmit="handleUserSubmit(event)">
+            <input type="text" id="chat-input" class="chat-input" placeholder="Type a question..." required>
+            <button type="submit" class="btn" style="width: auto; padding: 10px 20px;" id="lbl-send">Send</button>
+        </form>
+    </div>
+
+    <footer>
+        <p id="footer-text">Shared Petanque Calendar Access Page | <a href="index.html" style="color: inherit; text-decoration: underline;">Home</a></p>
+    </footer>
+</div>
+
+<script>
+    // --- Multilingual Translations Data ---
+    const i18n = {
+        en: {
+            pageTitle: "FAQ & Petanque Rules - Bulgaria Petanque Tournaments",
+            lblBack: "Back to Calendar",
+            faqTitle: "Frequently Asked Questions",
+            chatHeading: "Petanque Assistant Bot",
+            chatSub: "Ask about rules, scoring, complex situations, or calendar sync",
+            botWelcome: "Hello! I am your Petanque Assistant. Select a question below or type your question about rules and calendar setup!",
+            inputPlaceholder: "Type a question...",
+            lblSend: "Send",
+            lblClear: "Clear",
+            footerText: "Shared Petanque Calendar Access Page",
+            faqs: [
+                {
+                    q: "How do I subscribe to the live calendar on iOS or Android?",
+                    a: "Use the 'Subscribe (iCal)' button on the main page. On iOS or macOS, clicking it opens Apple Calendar automatically. On Android/Google, copy the link or click 'Add to Google'."
+                },
+                {
+                    q: "What is the standard distance for placing the Jack (Cochonnet)?",
+                    a: "In adult petanque, the jack must be thrown between 6 and 10 meters from the throwing circle, and at least 1 meter away from any obstacle or boundary line."
+                },
+                {
+                    q: "What happens if a boules hit is measured to be equidistant to the jack?",
+                    a: "If the two closest opposing boules are strictly equidistant from the jack, the end is dead if both teams have no boules left. If both have boules left, the team that played last plays again, followed by the opponent."
+                },
+                {
+                    q: "How are points counted at the end of an end (mène)?",
+                    a: "Only one team scores points in each end. They receive 1 point for each of their boules that is closer to the jack than the opponent's closest boule."
+                }
+            ],
+            prompts: [
+                { label: "📏 Jack distance rule", query: "jack distance" },
+                { label: "🤝 Equidistant boules", query: "equidistant" },
+                { label: "📱 Calendar sync help", query: "sync" },
+                { label: "🏆 Winning score", query: "winning score" }
+            ],
+            botAnswers: {
+                jack: "The jack (cochonnet) must be thrown between 6m and 10m from the circle, at least 1m away from obstacles/boundaries, and visible to players standing in the circle.",
+                equidistant: "When two opposing boules are equidistant to the jack: If neither team has boules left, the end is null. If both have boules, the team that threw the last boule plays again.",
+                sync: "To sync on your phone, click 'Subscribe (iCal)' for native Apple/Outlook auto-sync, or use 'Add to Google' for Android devices.",
+                score: "Standard petanque matches are played until a team reaches 13 points (or 11 points in some preliminary group rounds).",
+                default: "Thanks for asking! For specific rule details, official FIPJP guidelines apply. You can also test quick questions using the buttons above."
+            }
+        },
+        bg: {
+            pageTitle: "ЧЗВ и Правила за Петанк - Петанк Турнири в България",
+            lblBack: "Назад към календара",
+            faqTitle: "Често задавани въпроси",
+            chatHeading: "Петанк Бот Асистент",
+            chatSub: "Попитайте за правила, точки, сложни ситуации или синхронизация",
+            botWelcome: "Здравейте! Аз съм вашият асистент за петанк. Изберете въпрос по-долу или напишете вашето запитване!",
+            inputPlaceholder: "Напишете въпрос...",
+            lblSend: "Изпрати",
+            lblClear: "Изчисти",
+            footerText: "Страница за споделен достъп до календари",
+            faqs: [
+                {
+                    q: "Как да се абонирам за календара на iOS или Android?",
+                    a: "Използвайте бутона 'Абониране (iCal)' от началната страница за iOS/Outlook или 'Добави в Google' за Android устройства."
+                },
+                {
+                    q: "Какво е стандартното разстояние за хвърляне на кошонета?",
+                    a: "Кошонетът трябва да бъде хвърлен на разстояние между 6 и 10 метра от кръга за хвърляне и на поне 1 метър от препятствия или граници."
+                },
+                {
+                    q: "Какво се случва при равенство в разстоянието на две топки?",
+                    a: "Ако две противникови топки са на абсолютно еднакво разстояние от кошонета и никой отбор няма повече топки, рундът се анулира. Ако и двата отбора имат топки, играе отборът, който е хвърлил последен."
+                },
+                {
+                    q: "Как се броят точките в края на рунда (mène)?",
+                    a: "Точки отбелязва само отборът с най-близка топка до кошонета. Той получава по 1 точка за всяка своя топка, която е по-близо до кошонета от най-близката топка на противника."
+                }
+            ],
+            prompts: [
+                { label: "📏 Разстояние за кошонет", query: "jack distance" },
+                { label: "🤝 Равни топки", query: "equidistant" },
+                { label: "📱 Синхронизация", query: "sync" },
+                { label: "🏆 Победител точки", query: "winning score" }
+            ],
+            botAnswers: {
+                jack: "Кошонетът трябва да бъде между 6m и 10m от кръга, поне на 1m от препятствия и видим от състезателя в кръга.",
+                equidistant: "При равни топки: ако никой няма повече топки - рундът е празен. Ако имат оставащи топки - играе отборът, който е хвърлил последната топка.",
+                sync: "За синхронизация натиснете 'Абониране (iCal)' за Apple/Outlook или 'Добави в Google' за Google Календар.",
+                score: "Официалните мачове по петанк се играят до достигане на 13 точки.",
+                default: "Благодарим за въпроса! При сложни казуси се прилагат официалните правила на FIPJP."
+            }
+        },
+        fr: {
+            pageTitle: "FAQ & Règles de la Pétanque - Petanque Tournaments",
+            lblBack: "Retour au calendrier",
+            faqTitle: "Foire aux Questions",
+            chatHeading: "Assistant Pétanque",
+            chatSub: "Posez vos questions sur les règles, les points ou la synchronisation",
+            botWelcome: "Bonjour ! Je suis votre assistant Pétanque. Choisissez une question ci-dessous ou tapez la vôtre !",
+            inputPlaceholder: "Posez une question...",
+            lblSend: "Envoyer",
+            lblClear: "Effacer",
+            footerText: "Page d'accès partagé du calendrier",
+            faqs: [
+                {
+                    q: "Comment s'abonner au calendrier sur iOS ou Android ?",
+                    a: "Utilisez le bouton 'S'abonner (iCal)' sur la page principale pour Apple/Outlook ou 'Ajouter à Google' pour Android."
+                },
+                {
+                    q: "Quelle est la distance réglementaire pour lancer le but (cochonnet) ?",
+                    a: "Le but doit être lancé à une distance comprise entre 6 et 10 mètres du cercle de lancer, et à au moins 1 mètre de tout obstacle ou ligne de perte."
+                },
+                {
+                    q: "Que se passe-t-il si deux boules adverses sont équidistantes du but ?",
+                    a: "Si deux boules adverses sont à égale distance du but et qu'aucun équipe n'a plus de boules, la mène est nulle. Si les deux équipes ont des boules, l'équipe qui a joué la dernière rejoue."
+                },
+                {
+                    q: "Comment compte-t-on les points à la fin d'une mène ?",
+                    a: "Seule l'équipe dont la boule est la plus proche du but marque des points (1 point par boule mieux placée que la meilleure boule adverse)."
+                }
+            ],
+            prompts: [
+                { label: "📏 Distance du but", query: "jack distance" },
+                { label: "🤝 Boules équidistantes", query: "equidistant" },
+                { label: "📱 Synchro agenda", query: "sync" },
+                { label: "🏆 Score gagnant", query: "winning score" }
+            ],
+            botAnswers: {
+                jack: "Le but doit être lancé entre 6m et 10m du cercle, à au moins 1m des obstacles et visible depuis le cercle.",
+                equidistant: "En cas d'équidistance : si plus de boules, la mène est nulle. S'il reste des boules, l'équipe qui a joué en dernier rejoue.",
+                sync: "Cliquez sur 'S'abonner (iCal)' pour Apple/Outlook ou 'Ajouter à Google' pour Android.",
+                score: "Les parties de pétanque se jouent en 13 points.",
+                default: "Merci pour votre question ! Pour les cas complexes, les règles officielles de la FIPJP s'appliquent."
+            }
+        },
+        sr: {
+            pageTitle: "ЧЗВ и Правила за Петанк - Петанк Турнири",
+            lblBack: "Назад на календар",
+            faqTitle: "Често постављана питања",
+            chatHeading: "Петанк Бот Асистент",
+            chatSub: "Питајте о правилима, бодовима или синкронизацији",
+            botWelcome: "Здраво! Ја сам ваш асистент за петанк. Изаберите питање или упишите ваше запитвање!",
+            inputPlaceholder: "Упишите питање...",
+            lblSend: "Пошаљи",
+            lblClear: "Очисти",
+            footerText: "Страница за дељени приступ календарима",
+            faqs: [
+                {
+                    q: "Како се претплатити на календар на мобилном?",
+                    a: "Користите дугме 'Претплати се (iCal)' за Apple/Outlook или 'Додај у Google' за Android."
+                },
+                {
+                    q: "Која је стандардна удаљеност за бацање булина (cochonnet)?",
+                    a: "Булин мора бити бачен на удаљеност између 6 и 10 метара од круга и најмање 1 метар од препрека."
+                },
+                {
+                    q: "Шта се дешава када су две кугле једнако удаљене од булина?",
+                    a: "Ако нико нема више кугли, рунда је неважећа. Ако обе екипе имају кугле, екипа која је последња играла баца поново."
+                },
+                {
+                    q: "Како се броје бодови на крају рунде?",
+                    a: "Бодове добија само екипа чија је кугла најближа булину (1 бод за сваку куглу ближу од противничке)."
+                }
+            ],
+            prompts: [
+                { label: "📏 Удаљеност булина", query: "jack distance" },
+                { label: "🤝 Једнаке кугле", query: "equidistant" },
+                { label: "📱 Синкронизација", query: "sync" },
+                { label: "🏆 Победнички бодови", query: "winning score" }
+            ],
+            botAnswers: {
+                jack: "Булин мора бити између 6m и 10m од круга и 1m од препрека.",
+                equidistant: "Код једнаке удаљености: без преосталих кугли рунда се анулира. Са куглама, игра онај ко је задњи бацао.",
+                sync: "За синкронизацију користите 'Претплати се (iCal)' или 'Додај у Google'.",
+                score: "Петанк утакмице се играју до 13 бодова.",
+                default: "Хвала на питању! За сложене ситуације важе званична FIPJP правила."
+            }
+        }
+    };
+
+    let activeLang = 'en';
+
+    function initPageLanguage() {
+        const detected = (navigator.language || navigator.userLanguage || 'en').substring(0, 2).toLowerCase();
+        activeLang = i18n[detected] ? detected : 'en';
+        const t = i18n[activeLang];
+
+        document.getElementById('faq-page-title').innerText = t.pageTitle;
+        document.getElementById('lbl-back').innerText = t.lblBack;
+        document.getElementById('faq-title').innerText = t.faqTitle;
+        document.getElementById('chat-heading').innerText = t.chatHeading;
+        document.getElementById('chat-sub').innerText = t.chatSub;
+        document.getElementById('bot-welcome').innerText = t.botWelcome;
+        document.getElementById('chat-input').placeholder = t.inputPlaceholder;
+        document.getElementById('lbl-send').innerText = t.lblSend;
+        document.getElementById('lbl-clear').innerText = t.lblClear;
+        document.getElementById('footer-text').innerHTML = `${t.footerText} | <a href="index.html" style="color: inherit; text-decoration: underline;">Home</a>`;
+
+        // Render FAQ list
+        const faqContainer = document.getElementById('faq-container');
+        faqContainer.innerHTML = t.faqs.map(item => `
+            <div class="faq-item">
+                <h3>${item.q}</h3>
+                <p>${item.a}</p>
+            </div>
+        `).join('');
+
+        // Render Quick Prompts
+        const promptContainer = document.getElementById('quick-prompts');
+        promptContainer.innerHTML = t.prompts.map(p => `
+            <button type="button" class="prompt-btn" onclick="sendQuickQuery('${p.query}', '${p.label}')">${p.label}</button>
+        `).join('');
+    }
+
+    // --- Interactive Chatbot Implementation ---
+    function appendChatMessage(text, sender) {
+        const chatWindow = document.getElementById('chat-window');
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `chat-msg ${sender}`;
+        msgDiv.innerText = text;
+        chatWindow.appendChild(msgDiv);
+        chatWindow.scrollTop = chatWindow.scrollHeight;
+    }
+
+    function clearChatHistory() {
+        const chatWindow = document.getElementById('chat-window');
+        const welcomeText = i18n[activeLang].botWelcome;
+        chatWindow.innerHTML = `<div class="chat-msg bot">${welcomeText}</div>`;
+    }
+
+    function getBotResponse(input) {
+        const query = input.toLowerCase();
+        const answers = i18n[activeLang].botAnswers;
+
+        if (query.includes('jack') || query.includes('distance') || query.includes('кошонет') || query.includes('булин') || query.includes('6') || query.includes('10')) {
+            return answers.jack;
+        } else if (query.includes('equidistant') || query.includes('равн') || query.includes('равно') || query.includes('равенство') || query.includes('equal')) {
+            return answers.equidistant;
+        } else if (query.includes('sync') || query.includes('calendar') || query.includes('синхрон') || query.includes('ical') || query.includes('google')) {
+            return answers.sync;
+        } else if (query.includes('score') || query.includes('win') || query.includes(' point') || query.includes('точк') || query.includes('13') || query.includes('бод')) {
+            return answers.score;
+        }
+        return answers.default;
+    }
+
+    function sendQuickQuery(queryKey, displayLabel) {
+        appendChatMessage(displayLabel, 'user');
+        setTimeout(() => {
+            const reply = getBotResponse(queryKey);
+            appendChatMessage(reply, 'bot');
+        }, 300);
+    }
+
+    function handleUserSubmit(e) {
+        e.preventDefault();
+        const inputElem = document.getElementById('chat-input');
+        const text = inputElem.value.trim();
+        if (!text) return;
+
+        appendChatMessage(text, 'user');
+        inputElem.value = '';
+
+        setTimeout(() => {
+            const reply = getBotResponse(text);
+            appendChatMessage(reply, 'bot');
+        }, 400);
+    }
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', initPageLanguage);
+</script>
+
+</body>
+</html>
