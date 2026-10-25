@@ -46,7 +46,8 @@ function updateTabTitle() {
     document.title = `${icon} ${headingText}`;
 }
 
-function switchCalendar(calKey) {
+// Expose switchCalendar globally for HTML onclick attributes
+window.switchCalendar = function(calKey) {
     const calName = (calKey === 'cal1') ? "Bulgaria (cal1)" : "World (cal2)";
 
     if (!initialLoad && visitDocRef) {
@@ -89,7 +90,7 @@ function switchCalendar(calKey) {
 
     updateTabTitle();
     initialLoad = false;
-}
+};
 
 function renderPageQr() {
     const currentUrl = window.location.href;
@@ -97,7 +98,8 @@ function renderPageQr() {
     new QRCode(document.getElementById("qr-page"), { text: currentUrl, width: 120, height: 120 });
 }
 
-function copyPageLink() {
+// Expose copyPageLink globally for HTML onclick attributes
+window.copyPageLink = function() {
     const dummy = document.createElement('input');
     document.body.appendChild(dummy);
     dummy.value = window.location.href;
@@ -114,7 +116,7 @@ function copyPageLink() {
                     (lang === 'sr') ? "Линк је копиран!" : "Copied!";
                     
     setTimeout(() => { btn.innerText = origText; }, 2000);
-}
+};
 
 // Translations dictionary
 const translations = {
