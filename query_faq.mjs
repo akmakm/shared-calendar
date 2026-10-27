@@ -1,27 +1,21 @@
-import { initializeApp, cert } from 'firebase-admin/app';
+// query_faq.mjs
+import { initializeApp, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { GoogleGenAI, Type } from '@google/genai';
-import fs from 'fs';
 
-// 1. Validate environment configuration
-const apiKey = process.env.GEMINI_API_KEY;
-if (!apiKey) {
-    console.error("❌ ERROR: GEMINI_API_KEY environment variable is missing!");
-    process.exit(1);
+// Hardcoded Gemini API Key
+const GEMINI_API_KEY = "AQ.Ab8RN6LmVhXC3H_-1eBy9EuEGnGBpv9e2BF0NboFc65oRXU5YQ";
+
+// Initialize Firebase Admin using Application Default Credentials (ADC)
+// This looks for standard environment variables (like GOOGLE_APPLICATION_CREDENTIALS) 
+// or cloud metadata automatically without needing a raw private key string.
+if (!getApps().length) {
+    initializeApp();
 }
 
-// 2. Initialize Firebase Admin SDK
-const serviceAccount = JSON.parse(
-    fs.readFileSync(new URL('./serviceAccountKey.json', import.meta.url))
-);
-
-initializeApp({ credential: cert(serviceAccount) });
 const db = getFirestore();
-const ai = new GoogleGenAI({ apiKey });
+const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 
-/**
- * Mathematical helper: Calculate Cosine Similarity between two numeric vectors
- */
 function cosineSimilarity(vecA, vecB) {
     let dotProduct = 0;
     let normA = 0;
@@ -36,115 +30,89 @@ function cosineSimilarity(vecA, vecB) {
 }
 
 /**
- * 3. Main Component 2 Execution: Semantic Search + Structured Generation
+ * Searches the FAQ knowledge base semantically and returns structured candidates.
  */
-async function queryFAQ(userQuery) {
-    console.log(`\n🔎 User Query: "${userQuery}"`);
-
-    try {
-        // Step A: Generate query embedding using RETRIEVAL_QUERY task type
-        console.log("⏳ Generating query vector with gemini-embedding-001...");
-        const embeddingResponse = await ai.models.embedContent({
-            model: 'models/gemini-embedding-001',
-            contents: userQuery,
-            config: {
-                taskType: 'RETRIEVAL_QUERY', // Optimized for search queries
-                outputDimensionality: 768    // Matches Firestore document dimensions
-            }
-        });
-
-        const queryVector = embeddingResponse.embedding?.values || embeddingResponse.embeddings?.[0]?.values;
-        if (!queryVector) {
-            throw new Error("Failed to generate embedding for the user query.");
+export async function getSemanticAnswer(userQuery) {
+    // 1. Generate query vector using RETRIEVAL_QUERY task type
+    const embeddingResponse = await ai.models.embedContent({
+        model: 'models/gemini-embedding-001',
+        contents: userQuery,
+        config: {
+            taskType: 'RETRIEVAL_QUERY',
+            outputDimensionality: 768
         }
+    });
 
-        // Step B: Fetch all FAQ documents from Firestore
-        console.log("📚 Fetching knowledge base from Firestore...");
-        const snapshot = await db.collection("faq_knowledge_base").get();
-        
-        if (snapshot.empty) {
-            console.log("⚠️ Knowledge base is empty.");
-            return;
+    const queryVector = embeddingResponse.embedding?.values || embeddingResponse.embeddings?.[0]?.values;
+    if (!queryVector) {
+        throw new Error("Failed to generate embedding for the query.");
+    }
+
+    // 2. Fetch documents from Firestore[cite: 1]
+    const snapshot = await db.collection("faq_knowledge_base").get();
+    if (snapshot.empty) return { candidates: [] };
+
+    // 3. Compute Cosine Similarity
+    const scoredDocs = [];
+    snapshot.forEach(doc => {
+        const data = doc.data();
+        if (data.embedding && Array.isArray(data.embedding)) {
+            const score = cosineSimilarity(queryVector, data.embedding);
+            scoredDocs.push({
+                id: doc.id,
+                question: data.question,
+                answer: data.answer,
+                score: score
+            });
         }
+    });
 
-        // Step C: Compute Cosine Similarity for each document
-        const scoredDocs = [];
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            if (data.embedding && Array.isArray(data.embedding)) {
-                const score = cosineSimilarity(queryVector, data.embedding);
-                scoredDocs.push({
-                    id: doc.id,
-                    question: data.question,
-                    answer: data.answer,
-                    score: score
-                });
-            }
-        });
+    scoredDocs.sort((a, b) => b.score - a.score);
+    const topMatches = scoredDocs.slice(0, 3);
 
-        // Sort descending by similarity score and pick the top 3 matches
-        scoredDocs.sort((a, b) => b.score - a.score);
-        const topMatches = scoredDocs.slice(0, 3);
+    if (topMatches.length === 0 || topMatches[0].score < 0.4) {
+        return { candidates: [] };
+    }
 
-        console.log(`🎯 Top matching documents found:`);
-        topMatches.forEach((m, idx) => {
-            console.log(`   [${idx + 1}] Score: ${m.score.toFixed(4)} | Q: ${m.question}`);
-        });
+    // 4. Synthesize via Gemini Structured Outputs
+    const contextString = topMatches
+        .map(m => `Source ID: ${m.id}\nQuestion: ${m.question}\nAnswer: ${m.answer}`)
+        .join("\n\n---\n\n");
 
-        if (topMatches.length === 0 || topMatches[0].score < 0.4) {
-            console.log("🤖 No sufficiently relevant matches found in the FAQ knowledge base.");
-            return;
-        }
-
-        // Step D: Pass context to Gemini with Structured Outputs schema
-        console.log("💬 Synthesizing response via Gemini LLM...");
-        const contextString = topMatches
-            .map(m => `Source ID: ${m.id}\nQuestion: ${m.question}\nAnswer: ${m.answer}`)
-            .join("\n\n---\n\n");
-
-        const prompt = `
-You are a helpful customer support assistant. Answer the user's question using ONLY the provided FAQ context below. Provide confidence scores between 0.0 and 1.0 for your candidates.
+    const prompt = `
+You are a helpful customer support assistant. Answer the user's question using ONLY the provided FAQ context below. Provide confidence scores between 0.0 and 1.0.
 
 User Question: "${userQuery}"
 
 FAQ Context:
 ${contextString}
-        `.trim();
+    `.trim();
 
-        const generativeResponse = await ai.models.generateContent({
-            model: 'gemini-2.5-flash', // Or your preferred generative model
-            contents: prompt,
-            config: {
-                responseMimeType: "application/json",
-                responseSchema: {
-                    type: Type.OBJECT,
-                    properties: {
-                        candidates: {
-                            type: Type.ARRAY,
-                            description: "List of matched answers addressing the query",
-                            items: {
-                                type: Type.OBJECT,
-                                properties: {
-                                    answer: { type: Type.STRING, description: "The synthesized answer text" },
-                                    confidence: { type: Type.NUMBER, description: "Confidence score between 0.0 and 1.0" },
-                                    source_doc_id: { type: Type.STRING, description: "The Firestore source document ID" }
-                                },
-                                required: ["answer", "confidence", "source_doc_id"]
-                            }
+    const generativeResponse = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+                type: Type.OBJECT,
+                properties: {
+                    candidates: {
+                        type: Type.ARRAY,
+                        items: {
+                            type: Type.OBJECT,
+                            properties: {
+                                answer: { type: Type.STRING },
+                                confidence: { type: Type.NUMBER },
+                                source_doc_id: { type: Type.STRING }
+                            },
+                            required: ["answer", "confidence", "source_doc_id"]
                         }
-                    },
-                    required: ["candidates"]
-                }
+                    }
+                },
+                required: ["candidates"]
             }
-        });
+        }
+    });
 
-        console.log("\n✨ Final Structured Response:");
-        console.log(JSON.parse(generativeResponse.text));
-
-    } catch (error) {
-        console.error("❌ Error running query pipeline:", error);
-    }
+    return JSON.parse(generativeResponse.text);
 }
-
-// Example test run
-queryFAQ("How far away does the cochonnet need to be?");
