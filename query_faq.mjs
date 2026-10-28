@@ -3,6 +3,15 @@ import { initializeApp, getApps } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { GoogleGenAI, Type } from '@google/genai';
 
+function getCurrentLanguage() {
+    const match = document.cookie.match(/(^|;) ?googtrans=([^;]*)(;|$)/);
+    if (match) {
+        const parts = match[2].split('/');
+        return parts[parts.length - 1] || 'en';
+    }
+    return 'en'; // Default fallback to English
+}
+
 // Hardcoded Gemini API Key
 const GEMINI_API_KEY = "AQ.Ab8RN6LmVhXC3H_-1eBy9EuEGnGBpv9e2BF0NboFc65oRXU5YQ";
 
