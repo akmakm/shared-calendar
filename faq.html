@@ -23,7 +23,7 @@
         <!-- Chat Output -->
         <div class="chat-messages" id="chat-messages">
             <div class="message bot">
-                Hello! I am your Petanque Assistant. Ask me anything about official rules, measuring boules, scoring, or calendar synchronization!
+                Hello! I am your Petanque Assistant. Ask me anything about official rules, measuring boules, scoring, or calendar synchronization![cite: 2]
             </div>
         </div>
 
@@ -66,8 +66,73 @@ function googleTranslateElementInit() {
 </script>
 <script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
 
-<!-- External Bot Logic Script (Must be a module to import db from firebase-config.js) -->
-<script type="module" src="faq_bot.js"></script>
+<!-- Inline script linking frontend UI actions to your deployed Cloud Function -->
+<script>
+const CLOUD_FUNCTION_URL = 'https://askfaq-g4ecmrqqxq-uc.a.run.app';
+
+function appendMessage(text, sender) {
+    const chatMessages = document.getElementById('chat-messages');
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `message ${sender}`;
+    msgDiv.textContent = text;
+    chatMessages.appendChild(msgDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+async function submitQuestion(questionText) {
+    if (!questionText.trim()) return;
+
+    appendMessage(questionText, 'user');
+    document.getElementById('user-input').value = '';
+
+    // Create placeholder for bot response
+    const chatMessages = document.getElementById('chat-messages');
+    const loadingDiv = document.createElement('div');
+    loadingDiv.className = 'message bot';
+    loadingDiv.textContent = 'Thinking...';
+    chatMessages.appendChild(loadingDiv);
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+
+    try {
+        const response = await fetch(CLOUD_FUNCTION_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                question: questionText,
+                language: 'en'
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error(`Server returned status: ${response.status}`);
+        }
+
+        const data = await response.json();
+        loadingDiv.textContent = data.answer || "Sorry, I couldn't find an answer.";
+    } catch (error) {
+        console.error("Failed to query Petanque FAQ bot:", error);
+        loadingDiv.textContent = "Sorry, I encountered an error connecting to the backend.";
+    }
+}
+
+function sendMessage() {
+    const input = document.getElementById('user-input');
+    submitQuestion(input.value);
+}
+
+function sendQuickPrompt(promptText) {
+    submitQuestion(promptText);
+}
+
+function handleKeyDown(event) {
+    if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        sendMessage();
+    }
+}
+</script>
 
 </body>
 </html>
