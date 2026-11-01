@@ -250,7 +250,7 @@ footer {
 .bot-avatar, .chat-header img {
   width: 80px;
   height: 80px;
-  border-radius: 50%;
+  border-radius: 0%;
   object-fit: cover; /* This crops the image to fill the circular container completely without white borders */
 }
 /*.chat-header {
