@@ -247,8 +247,13 @@ footer {
     overflow: hidden;
     width: 100%;
 }
-
-.chat-header {
+.bot-avatar, .chat-header img {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  object-fit: cover; /* This crops the image to fill the circular container completely without white borders */
+}
+/*.chat-header {
     background: #00966e;
     color: #ffffff;
     padding: 16px 20px;
@@ -256,7 +261,7 @@ footer {
     justify-content: space-between;
     align-items: center;
     border-bottom: 3px solid #d62612;
-}
+}*/
 
 .chat-header h2 {
     margin: 0;
