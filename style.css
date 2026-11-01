@@ -274,18 +274,27 @@ footer {
 }
 
 /* Google Translate Widget Customizations */
+
+/* Compact Google Translate Widget Wrapper */
 #google_translate_element {
-    display: flex;
-    margin-left: auto;
-    // alka display: inline-block;
+    display: inline-block;
+    max-width: 140px;
+    height: auto;
 }
 
+/* Make the internal Google element small and tight */
 .goog-te-gadget-simple {
     background-color: rgba(255, 255, 255, 0.2) !important;
     border: 1px solid rgba(255, 255, 255, 0.4) !important;
     padding: 4px 8px !important;
     border-radius: 6px !important;
-    font-size: 0.85rem !important;
+    font-size: 0.75rem !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+    white-space: nowrap !important;
 }
 
 .goog-te-gadget-simple span {
@@ -303,6 +312,19 @@ body {
 .goog-te-banner-frame {
     display: none !important;
 }
+/* Hide extra Google icons and arrow space */
+.goog-te-gadget-icon {
+    display: none !important;
+}
+
+.goog-te-menu-value {
+    margin-right: 0 !important;
+}
+
+.goog-te-menu-value span {
+    border: none !important;
+}
+/* End of google translator settings */
 
 .chat-messages {
     padding: 20px;
