@@ -247,12 +247,14 @@ footer {
     overflow: hidden;
     width: 100%;
 }
+
 .bot-avatar, .chat-header img {
   width: 80px;
   height: 80px;
   border-radius: 0%;
-  object-fit: cover; /* This crops the image to fill the circular container completely without white borders */
+  object-fit: cover;
 }
+
 .chat-header {
     background: #00966e;
     color: #ffffff;
@@ -431,4 +433,30 @@ body {
 .back-link:hover {
     background: #00966e;
     color: #ffffff;
+}
+
+/* =========================================
+   Mobile / Vertical Screen Full-Width Overrides
+   ========================================= */
+@media screen and (max-width: 768px) {
+    body {
+        padding: 0;
+    }
+
+    .faq-wrapper {
+        padding: 0;
+        max-width: 100%;
+    }
+
+    .chat-container {
+        width: 100%;
+        border-radius: 0;
+        border-left: none;
+        border-right: none;
+        box-shadow: none;
+    }
+
+    .chat-header {
+        border-radius: 0;
+    }
 }
