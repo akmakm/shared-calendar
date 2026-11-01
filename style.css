@@ -261,7 +261,7 @@ footer {
     padding: 16px 20px;
     display: flex;
     justify-content: space-between;
-    align-items: center;
+    align-items: left; //alka center;
     border-bottom: 3px solid #d62612;
 }
 
@@ -275,7 +275,9 @@ footer {
 
 /* Google Translate Widget Customizations */
 #google_translate_element {
-    display: inline-block;
+    display: flex;
+    margin-left: auto;
+    // alka display: inline-block;
 }
 
 .goog-te-gadget-simple {
@@ -445,7 +447,7 @@ body {
 
     .faq-wrapper {
         padding: 0;
-        max-width: 100%;
+        max-width: 95%; // alka
     }
 
     .chat-container {

@@ -25,7 +25,7 @@
         <!-- Chat Output -->
         <div class="chat-messages" id="chat-messages">
             <div class="message bot">
-                Hello! I am your Petanque Assistant. Ask me anything about official rules, measuring boules, scoring, or calendar synchronization![cite: 2]
+                Hello! You are talking to AI chatbot by Aleksandr Kartomin. Ask me about petanque rules and umpiring.
             </div>
         </div>
 
@@ -34,7 +34,6 @@
             <button class="prompt-btn" onclick="sendQuickPrompt('What is the allowed cochonnet distance?')">Cochonnet distance</button>
             <button class="prompt-btn" onclick="sendQuickPrompt('How does scoring work in Petanque?')">Scoring rules</button>
             <button class="prompt-btn" onclick="sendQuickPrompt('What happens if two boules are equidistant?')">Equidistant boules</button>
-            <button class="prompt-btn" onclick="sendQuickPrompt('How do I subscribe to the calendar?')">Calendar sync</button>
         </div>
 
         <!-- Multi-line Responsive Input -->
@@ -60,7 +59,7 @@
 function googleTranslateElementInit() {
     new google.translate.TranslateElement({
         pageLanguage: 'en',
-        includedLanguages: 'bg,en,fr,sr,de,es,it,ro,ru',
+        includedLanguages: 'bg,en,fr,sr,gr,de,es,it,ro',
         layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
         autoDisplay: false
     }, 'google_translate_element');
