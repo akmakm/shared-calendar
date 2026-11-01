@@ -253,7 +253,7 @@ footer {
   border-radius: 0%;
   object-fit: cover; /* This crops the image to fill the circular container completely without white borders */
 }
-/*.chat-header {
+.chat-header {
     background: #00966e;
     color: #ffffff;
     padding: 16px 20px;
@@ -261,7 +261,7 @@ footer {
     justify-content: space-between;
     align-items: center;
     border-bottom: 3px solid #d62612;
-}*/
+}
 
 .chat-header h2 {
     margin: 0;
