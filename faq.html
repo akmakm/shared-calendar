@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Petanque Assistant & FAQ</title>
-    <link rel="stylesheet" href="style.css?v=3">
+    <link rel="stylesheet" href="style.css?v=4">
 
     <!-- REQUIRED: Firebase v8 Compat SDK CDN Scripts -->
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
@@ -16,10 +16,13 @@
     <div class="chat-container">
         <!-- Chat Header with Google Translate Widget -->
         <div class="chat-header">
-            <!-- Replace your img tag parameters with object-fit: cover -->
-            <img src="fanny2.png" alt="Fanny Cochonnet" style="width: 80px; height: 80px; border-radius: 0%; object-fit: cover;" />
-            <h2>Pétanque AI FAQ</h2>
-            <div id="google_translate_element"></div>
+            <div class="header-left">
+                <img src="fanny2.png" alt="Fanny Cochonnet" />
+                <h2>Pétanque AI FAQ</h2>
+            </div>
+            <div class="header-right">
+                <div id="google_translate_element"></div>
+            </div>
         </div>
 
         <!-- Chat Output -->
@@ -67,7 +70,7 @@ function googleTranslateElementInit() {
 </script>
 <script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
 
-<!-- Inline script linking frontend UI actions to your deployed Cloud Function -->
+<!-- Inline script linking frontend UI actions to backend endpoint -->
 <script>
 const CLOUD_FUNCTION_URL = 'https://askfaq-g4ecmrqqxq-uc.a.run.app';
 
