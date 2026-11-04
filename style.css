@@ -255,13 +255,16 @@ footer {
   object-fit: cover;
 }
 
+/* Chat Header Layout */
 .chat-header {
+    gap: 10px;
+    flex-wrap: wrap; /* Allows items to wrap nicely on smaller mobile screens if needed */
     background: #00966e;
     color: #ffffff;
-    padding: 16px 20px;
+    padding: 12px 16px; /*16px 20px;*/
     display: flex;
     justify-content: space-between;
-    align-items: left; //alka center;
+    align-items: left; /*alka center;*/
     border-bottom: 3px solid #d62612;
 }
 
@@ -299,24 +302,20 @@ footer {
     border: none !important;        /* optional: drop the box look */
     background: transparent !important;
 }
+
 /* hide every span inside the link: the "Select Language" text,
    the separator bar, and the ▼ arrow */
 #google_translate_element .goog-te-gadget-simple a span {
   display: none !important;
 }
-
 .goog-te-gadget-simple span {
     color: #ffffff !important;
 }
-
-.goog-te-gadget-icon {
-    display: none !important;
-}
-
+/* Ensure the body clears space for the Google Translate top banner */
 body {
     top: 0px !important;
+    padding-top: 45px !important; /* Forces the page down so Google's bar doesn't cover your header */
 }
-
 .goog-te-banner-frame {
     display: none !important;
 }
