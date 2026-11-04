@@ -284,35 +284,46 @@ footer {
     white-space: normal; /* Ensures long translated titles wrap onto multiple lines instead of clipping */
 }
 
-/* Google Translate Widget Customizations */
-
-/* Compact Google Translate Widget Wrapper */
+/* =========================================
+   Google Translate Widget Customizations
+   ========================================= */
+/* Compact Google Translate Widget Wrapper 
 #google_translate_element {
     display: inline-block;
     align-items: center;
-    max-width: 50px;
+    max-width: 40px;
     overflow: hidden;
     height: 25px;
     flex-shrink: 0;
+}*/
+#google_translate_element {
+    display: inline-block;
+    overflow: visible;
 }
 
 /* Make the internal Google element small and tight */
 #google_translate_element .goog-te-gadget-simple {
-    background-color: rgba(255, 255, 255, 0.2) !important;
-    border: 1px solid rgba(255, 255, 255, 0.4) !important;
-    padding: 2px !important;
+    background-color: rgba(255, 255, 255, 0.15) !important; /*0.2) !important;*/
+    border: 1px solid rgba(255, 255, 255, 0.3) !important; /* 0.4) !important;*/
+    /*padding: 2px !important;*/
+    padding: 4px 8px !important;
     border-radius: 6px !important;
-    font-size: 0.75rem !important;
+    font-size: 0.85rem !important; /*0.75rem !important;*/
     display: flex !important;
     align-items: center !important;
     justify-content: space-between !important;
     max-width: 100% !important;
     overflow: hidden !important;
+    gap: 6px !important;
     white-space: nowrap !important;
     /*border: none !important;        /* optional: drop the box look */
     background: transparent !important;
 }
-
+/* Ensure text inside the gadget is readable white */
+#google_translate_element .goog-te-gadget-simple span {
+    color: #ffffff !important;
+    border: none !important;
+}
 /* hide every span inside the link: the "Select Language" text,
    the separator bar, and the ▼ arrow */
 #google_translate_element .goog-te-gadget-simple a span {
@@ -321,20 +332,23 @@ footer {
 .goog-te-gadget-simple span {
     color: #ffffff !important;
 }
-/* Ensure the body clears space for the Google Translate top banner */
+/* Prevent Google's injection frame from shifting the body */
 body {
     top: 0px !important;
     padding-top: 45px !important; /* Forces the page down so Google's bar doesn't cover your header */
+    position: static !important;
 }
 .goog-te-banner-frame {
     display: none !important;
 }
-/* the icon stays visible */
+/* Hide unwanted long text labels if you want it ultra-compact, or let it show nicely */
 #google_translate_element .goog-te-gadget-icon {
-  display: inline-block !important;
-  margin: 0 !important;
+    display: inline-block !important;
+    width: 16px !important;
+    height: 16px !important;
+    margin: 0 !important;
+    vertical-align: middle;
 }
-
 .goog-te-menu-value {
     margin-right: 0 !important;
 }
