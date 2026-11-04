@@ -278,15 +278,16 @@ footer {
 /* Compact Google Translate Widget Wrapper */
 #google_translate_element {
     display: inline-block;
-    max-width: 140px;
-    height: auto;
+    max-width: 30px;
+    overflow: hidden;
+    height: 30px;
 }
 
 /* Make the internal Google element small and tight */
-.goog-te-gadget-simple {
+#google_translate_element .goog-te-gadget-simple {
     background-color: rgba(255, 255, 255, 0.2) !important;
     border: 1px solid rgba(255, 255, 255, 0.4) !important;
-    padding: 4px 8px !important;
+    padding: 2px !important;
     border-radius: 6px !important;
     font-size: 0.75rem !important;
     display: flex !important;
@@ -295,6 +296,13 @@ footer {
     max-width: 100% !important;
     overflow: hidden !important;
     white-space: nowrap !important;
+    border: none !important;        /* optional: drop the box look */
+    background: transparent !important;
+}
+/* hide every span inside the link: the "Select Language" text,
+   the separator bar, and the ▼ arrow */
+#google_translate_element .goog-te-gadget-simple a span {
+  display: none !important;
 }
 
 .goog-te-gadget-simple span {
@@ -312,9 +320,10 @@ body {
 .goog-te-banner-frame {
     display: none !important;
 }
-/* Hide extra Google icons and arrow space */
-.goog-te-gadget-icon {
-    display: none !important;
+/* the icon stays visible */
+#google_translate_element .goog-te-gadget-icon {
+  display: inline-block !important;
+  margin: 0 !important;
 }
 
 .goog-te-menu-value {
