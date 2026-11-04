@@ -298,6 +298,7 @@ footer {
 }*/
 #google_translate_element {
     display: inline-block;
+    align-items: center;
     overflow: visible;
 }
 
@@ -344,8 +345,8 @@ body {
 /* Hide unwanted long text labels if you want it ultra-compact, or let it show nicely */
 #google_translate_element .goog-te-gadget-icon {
     display: inline-block !important;
-    width: 16px !important;
-    height: 16px !important;
+    width: 40px !important;
+    height: 20px !important;
     margin: 0 !important;
     vertical-align: middle;
 }
