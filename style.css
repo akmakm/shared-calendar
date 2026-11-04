@@ -249,9 +249,8 @@ footer {
 }
 
 .bot-avatar, .chat-header img {
-    width: 60px;
-    height: 30px;
-    align-items: center;
+    width: 50px;
+    height: 50px;
     border-radius: 0%;
     object-fit: cover;
     flex-shrink: 0;
@@ -290,9 +289,10 @@ footer {
 /* Compact Google Translate Widget Wrapper */
 #google_translate_element {
     display: inline-block;
-    max-width: 30px;
+    align-items: center;
+    max-width: 50px;
     overflow: hidden;
-    height: 30px;
+    height: 25px;
     flex-shrink: 0;
 }
 
@@ -309,7 +309,7 @@ footer {
     max-width: 100% !important;
     overflow: hidden !important;
     white-space: nowrap !important;
-    border: none !important;        /* optional: drop the box look */
+    /*border: none !important;        /* optional: drop the box look */
     background: transparent !important;
 }
 
