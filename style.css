@@ -296,39 +296,73 @@ footer {
     height: 25px;
     flex-shrink: 0;
 }*/
-#google_translate_element {
-    display: inline-block;
-    align-items: center;
-    overflow: visible;
+.goog-te-gadget {
+    font-family: arial;
+    font-size: 11px;
+    color: #666;
+    white-space: nowrap
 }
 
-/* Make the internal Google element small and tight */
+
+.goog-te-gadget img {
+    vertical-align: middle;
+    border: none
+}
+
+
 #google_translate_element .goog-te-gadget-simple {
-    background-color: rgba(255, 255, 255, 0.15) !important; /*0.2) !important;*/
-    border: 1px solid rgba(255, 255, 255, 0.3) !important; /* 0.4) !important;*/
-    /*padding: 2px !important;*/
-    padding: 4px 8px !important;
-    border-radius: 6px !important;
-    font-size: 0.85rem !important; /*0.75rem !important;*/
-    display: flex !important;
-    align-items: center !important;
-    justify-content: space-between !important;
-    max-width: 100% !important;
-    overflow: hidden !important;
-    gap: 6px !important;
-    white-space: nowrap !important;
-    /*border: none !important;        /* optional: drop the box look */
-    background: transparent !important;
+  display: inline-flex !important;
+  align-items: center;
+  gap: 6px;
+  background: #ffffff !important;
+  border: none !important;
+  border-radius: 20px;
+  padding: 6px 14px !important;
+  cursor: pointer;
+  font-family: inherit !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .15);
+  transition: box-shadow .15s ease, transform .15s ease;
 }
-/* Ensure text inside the gadget is readable white */
-#google_translate_element .goog-te-gadget-simple span {
-    color: #ffffff !important;
-    border: none !important;
+#google_translate_element .goog-te-gadget-simple:hover {
+  box-shadow: 0 2px 6px rgba(0, 0, 0, .25);
+  transform: translateY(-1px);
 }
-/* hide every span inside the link: the "Select Language" text,
-   the separator bar, and the ▼ arrow */
-#google_translate_element .goog-te-gadget-simple a span {
+/* keep the Google icon, tidy its spacing */
+#google_translate_element .goog-te-gadget-icon {
+  display: inline-block !important;
+  width: 16px !important;
+  height: 16px !important;
+  margin: 0 !important;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%230e7a56' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='10'/%3E%3Cpath d='M2 12h20'/%3E%3Cpath d='M12 2c3.5 3.5 3.5 16.5 0 20'/%3E%3Cpath d='M12 2c-3.5 3.5-3.5 16.5 0 20'/%3E%3C/svg%3E") !important;
+  background-position: center !important;
+  background-size: 16px 16px !important;
+  background-repeat: no-repeat !important;
+}
+/* hide ALL of Google's text bits: "Select Language", separator, spacers */
+#google_translate_element .goog-te-gadget-simple a span,
+#google_translate_element .goog-te-gadget-simple a img {
   display: none !important;
+}
+/* our own label */
+#google_translate_element .goog-te-gadget-simple a::before {
+  content: "Language";
+  font-size: 13px;
+  font-weight: 600;
+  color: #0e7a56;             /* match your header green */
+  letter-spacing: .02em;
+}
+/* our own dropdown arrow, so it looks deliberate */
+#google_translate_element .goog-te-gadget-simple a::after {
+  content: "▾";
+  font-size: 12px;
+  color: #0e7a56;
+  margin-left: 4px;
+}
+/* make the link lay out as flex so icon/label/arrow align */
+#google_translate_element .goog-te-gadget-simple a {
+  display: inline-flex !important;
+  align-items: center;
+  text-decoration: none !important;
 }
 .goog-te-gadget-simple span {
     color: #ffffff !important;
