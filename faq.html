@@ -16,7 +16,6 @@
     <div class="chat-container">
         <!-- Chat Header with Google Translate Widget -->
         <div class="chat-header">
-            <!-- Replace your img tag parameters with object-fit: cover -->
             <img src="fanny2.png" alt="Fanny Cochonnet" style="width: 80px; height: 80px; border-radius: 0%; object-fit: cover;" />
             <h2>Pétanque AI FAQ</h2>
             <div id="google_translate_element"></div>
@@ -67,7 +66,10 @@ function googleTranslateElementInit() {
 </script>
 <script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
 
-<!-- Inline script linking frontend UI actions to your deployed Cloud Function -->
+<!-- Load faq_bot.js as a module so it can access firebase-config.js and provide the fallback -->
+<script type="module" src="faq_bot.js"></script>
+
+<!-- Inline script linking frontend UI actions to your deployed Cloud Function with fallback -->
 <script>
 const CLOUD_FUNCTION_URL = 'https://askfaq-g4ecmrqqxq-uc.a.run.app';
 
@@ -113,8 +115,14 @@ async function submitQuestion(questionText) {
         const data = await response.json();
         loadingDiv.textContent = data.answer || "Sorry, I couldn't find an answer.";
     } catch (error) {
-        console.error("Failed to query Petanque FAQ bot:", error);
-        loadingDiv.textContent = "Sorry, I encountered an error connecting to the backend.";
+        console.warn("Cloud Run backend unreachable. Falling back to client-side FAQ bot...", error);
+
+        // FALLBACK: If Cloud Run fetch fails, invoke client-side fallback from faq_bot.js
+        if (typeof window.fetchClientSideFaq === 'function') {
+            await window.fetchClientSideFaq(questionText, loadingDiv);
+        } else {
+            loadingDiv.textContent = "Sorry, I encountered an error connecting to the backend.";
+        }
     }
 }
 
