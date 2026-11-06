@@ -66,7 +66,11 @@ window.sendMessage = async function() {
 
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
-
+window.sendWithText = async function(text) {
+    const { userInput } = getElements();
+    if (userInput) userInput.value = text;
+    await window.sendMessage();
+};
 function appendMessage(content, sender) {
     const { chatMessages } = getElements();
     if (!chatMessages) return null;
