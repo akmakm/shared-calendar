@@ -154,3 +154,24 @@ async function logFaqError(error, additionalContext = {}) {
         console.error("Failed to write error log to Firestore:", loggingErr);
     }
 }
+// Expose a safe client-side fallback handler for faq.html
+window.fetchClientSideFaq = async function(questionText, loadingElem) {
+    try {
+        const replyData = await findBestFaqMatch(questionText);
+        
+        if (loadingElem) loadingElem.remove();
+        appendMessage(replyData.answer, 'bot');
+
+        // Increment display_count in Firestore
+        if (replyData.docId) {
+            await db.collection("faq_knowledge_base").doc(replyData.docId).update({
+                display_count: firebase.firestore.FieldValue.increment(1)
+            });
+        }
+    } catch (error) {
+        console.error("Client-side fallback error:", error);
+        if (loadingElem) loadingElem.remove();
+        appendMessage("Sorry, I encountered an issue connecting to the knowledge base.", 'bot');
+        logFaqError(error, { query: questionText, action: "clientSideFallback" });
+    }
+};
