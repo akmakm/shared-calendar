@@ -66,7 +66,7 @@ function googleTranslateElementInit() {
 </script>
 <script type="text/javascript" src="//translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
 
-<!-- Load faq_bot.js as a module so it can access firebase-config.js and provide the fallback -->
+<!-- Load faq_bot.js as a module so it can provide the client-side fallback -->
 <script type="module" src="faq_bot.js"></script>
 
 <!-- Inline script linking frontend UI actions to your deployed Cloud Function with fallback -->
@@ -80,6 +80,34 @@ function appendMessage(text, sender) {
     msgDiv.textContent = text;
     chatMessages.appendChild(msgDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;
+    return msgDiv;
+}
+
+// Helper to format bot responses with optional clickable source links safely
+function setBotMessageContent(msgDiv, content, sourceUrl) {
+    msgDiv.innerHTML = ''; // Clear "Thinking..."
+
+    const textSpan = document.createElement('span');
+    textSpan.textContent = content;
+    msgDiv.appendChild(textSpan);
+
+    if (sourceUrl && sourceUrl.trim() !== '') {
+        const br = document.createElement('br');
+        msgDiv.appendChild(br);
+
+        const sourceLink = document.createElement('a');
+        sourceLink.href = sourceUrl;
+        sourceLink.textContent = '🔗 Source Reference';
+        sourceLink.target = '_blank';
+        sourceLink.rel = 'noopener noreferrer';
+        sourceLink.style.display = 'inline-block';
+        sourceLink.style.marginTop = '6px';
+        sourceLink.style.fontSize = '0.85em';
+        sourceLink.style.color = 'inherit';
+        sourceLink.style.textDecoration = 'underline';
+        
+        msgDiv.appendChild(sourceLink);
+    }
 }
 
 async function submitQuestion(questionText) {
@@ -113,20 +141,26 @@ async function submitQuestion(questionText) {
         }
 
         const data = await response.json();
-        loadingDiv.textContent = data.answer || "Sorry, I couldn't find an answer.";
+        
+        // Render Cloud Run answer and optional source link (expecting data.answer and data.source)
+        setBotMessageContent(
+            loadingDiv, 
+            data.answer || "Sorry, I couldn't find an answer.", 
+            data.source || data.sourceUrl
+        );
+
     } catch (error) {
-        console.warn("Cloud Run backend unreachable. Invoking client-side fallback...", error);
-    
-        // Set input text back and call the suffixed fallback function
-        const inputField = document.getElementById('user-input');
-        inputField.value = questionText;
-    
-        if (typeof window.sendMessage_noAI === 'function') {
-             window.sendMessage_noAI();
+        console.warn("Cloud Run backend unreachable. Falling back to client-side FAQ bot...", error);
+
+        // FALLBACK: If Cloud Run fetch fails, invoke client-side fallback from faq_bot.js
+        if (typeof window.fetchClientSideFaq === 'function') {
+            await window.fetchClientSideFaq(questionText, loadingDiv);
         } else {
             loadingDiv.textContent = "Sorry, I encountered an error connecting to the backend.";
         }
     }
+    
+    chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
 function sendMessage() {
