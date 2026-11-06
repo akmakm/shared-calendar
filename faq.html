@@ -115,11 +115,14 @@ async function submitQuestion(questionText) {
         const data = await response.json();
         loadingDiv.textContent = data.answer || "Sorry, I couldn't find an answer.";
     } catch (error) {
-        console.warn("Cloud Run backend unreachable. Falling back to client-side FAQ bot...", error);
-
-        // FALLBACK: If Cloud Run fetch fails, invoke client-side fallback from faq_bot.js
-        if (typeof window.fetchClientSideFaq === 'function') {
-            await window.fetchClientSideFaq(questionText, loadingDiv);
+        console.warn("Cloud Run backend unreachable. Invoking client-side fallback...", error);
+    
+        // Set input text back and call the suffixed fallback function
+        const inputField = document.getElementById('user-input');
+        inputField.value = questionText;
+    
+        if (typeof window.sendMessage_noAI === 'function') {
+             window.sendMessage_noAI();
         } else {
             loadingDiv.textContent = "Sorry, I encountered an error connecting to the backend.";
         }
