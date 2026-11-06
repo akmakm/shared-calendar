@@ -44,7 +44,8 @@ window.sendMessage_noAI = async function() {
         const loadingElem = document.getElementById(loadingId);
         if (loadingElem) loadingElem.remove();
 
-        appendMessage_noAI(replyData.answer, 'bot');
+        // Pass the source URL if available so it renders as a clickable link
+        appendMessage_noAI(replyData.answer, 'bot', replyData.source);
 
         // Increment display_count in /faq_knowledge_base
         if (replyData.docId) {
@@ -67,14 +68,38 @@ window.sendMessage_noAI = async function() {
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
 
-function appendMessage_noAI(content, sender) {
+function appendMessage_noAI(content, sender, sourceUrl = null) {
     const { chatMessages } = getElements_noAI();
     if (!chatMessages) return null;
 
     const msgDiv = document.createElement('div');
     msgDiv.className = `message ${sender.includes('loading') ? 'bot' : sender}`;
     msgDiv.id = 'msg-' + Math.random().toString(36).substring(2, 9);
-    msgDiv.textContent = content;
+
+    // Safely assign text content to prevent XSS
+    const textSpan = document.createElement('span');
+    textSpan.textContent = content;
+    msgDiv.appendChild(textSpan);
+
+    // If a source URL exists, append a secure clickable link element
+    if (sourceUrl && sourceUrl.trim() !== '') {
+        const br = document.createElement('br');
+        msgDiv.appendChild(br);
+
+        const sourceLink = document.createElement('a');
+        sourceLink.href = sourceUrl;
+        sourceLink.textContent = '🔗 Source Reference';
+        sourceLink.target = '_blank';
+        sourceLink.rel = 'noopener noreferrer';
+        sourceLink.style.display = 'inline-block';
+        sourceLink.style.marginTop = '6px';
+        sourceLink.style.fontSize = '0.85em';
+        sourceLink.style.color = 'inherit';
+        sourceLink.style.textDecoration = 'underline';
+        
+        msgDiv.appendChild(sourceLink);
+    }
+
     chatMessages.appendChild(msgDiv);
     return msgDiv.id;
 }
@@ -86,6 +111,7 @@ async function findBestFaqMatch_noAI(query) {
         
         let bestMatch = {
             answer: "Thanks for your question! I couldn't find a direct match in our database. Try asking about cochonnet distances, scoring, or calendar sync.",
+            source: null,
             docId: null,
             score: 0
         };
@@ -94,6 +120,7 @@ async function findBestFaqMatch_noAI(query) {
             const data = documentSnapshot.data();
             const dbQuestion = data.question || "";
             const dbAnswer = data.answer || "";
+            const dbSource = data.source || null;
             
             const targetTokens = new Set([...cleanAndTokenize_noAI(dbQuestion), ...cleanAndTokenize_noAI(dbAnswer)]);
             
@@ -107,6 +134,7 @@ async function findBestFaqMatch_noAI(query) {
             if (matchScore > bestMatch.score) {
                 bestMatch = {
                     answer: dbAnswer,
+                    source: dbSource,
                     docId: documentSnapshot.id,
                     score: matchScore
                 };
@@ -116,6 +144,7 @@ async function findBestFaqMatch_noAI(query) {
         if (bestMatch.score === 0) {
             return {
                 answer: "I couldn't find a close match for that in our petanque knowledge base. Feel free to rephrase or check our quick prompts below!",
+                source: null,
                 docId: null
             };
         }
