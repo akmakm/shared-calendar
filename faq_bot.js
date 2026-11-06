@@ -1,50 +1,50 @@
 import { db } from "./firebase-config.js";
 
 // Safe helper to fetch DOM elements dynamically when actions occur
-function getElements() {
+function getElements_noAI() {
     return {
         chatMessages: document.getElementById('chat-messages'),
         userInput: document.getElementById('user-input')
     };
 }
 
-window.handleKeyDown = function(e) {
+window.handleKeyDown_noAI = function(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        window.sendMessage();
+        window.sendMessage_noAI();
     }
 }
 
-window.sendQuickPrompt = function(promptText) {
-    logFaqError("sendQuickPrompt","promptText="+promptText);
-    const { userInput } = getElements();
+window.sendQuickPrompt_noAI = function(promptText) {
+    logFaqError_noAI("sendQuickPrompt_noAI", "promptText=" + promptText);
+    const { userInput } = getElements_noAI();
     if (!userInput) return;
     
     userInput.value = promptText;
-    window.sendMessage();
+    window.sendMessage_noAI();
 }
 
-window.sendMessage = async function() {
-    const { chatMessages, userInput } = getElements();
-    logFaqError("sendMessage","userInput="+userInput.value.trim());
+window.sendMessage_noAI = async function() {
+    const { chatMessages, userInput } = getElements_noAI();
+    logFaqError_noAI("sendMessage_noAI", "userInput=" + userInput.value.trim());
     if (!userInput || !chatMessages) return;
 
     const text = userInput.value.trim();
     if (!text) return;
 
-    appendMessage(text, 'user');
+    appendMessage_noAI(text, 'user');
     userInput.value = '';
     chatMessages.scrollTop = chatMessages.scrollHeight;
 
-    const loadingId = appendMessage("Searching knowledge base...", 'bot loading');
+    const loadingId = appendMessage_noAI("Searching knowledge base...", 'bot loading');
 
     try {
-        const replyData = await findBestFaqMatch(text);
+        const replyData = await findBestFaqMatch_noAI(text);
         
         const loadingElem = document.getElementById(loadingId);
         if (loadingElem) loadingElem.remove();
 
-        appendMessage(replyData.answer, 'bot');
+        appendMessage_noAI(replyData.answer, 'bot');
 
         // Increment display_count in /faq_knowledge_base
         if (replyData.docId) {
@@ -58,21 +58,17 @@ window.sendMessage = async function() {
         const loadingElem = document.getElementById(loadingId);
         if (loadingElem) loadingElem.remove();
         
-        appendMessage("Sorry, I encountered an issue connecting to the knowledge base. Please try again.", 'bot');
+        appendMessage_noAI("Sorry, I encountered an issue connecting to the knowledge base. Please try again.", 'bot');
 
         // Log the actual error to the 'error_logs' Firestore collection
-        logFaqError(error, { query: text, action: "sendMessage" });
+        logFaqError_noAI(error, { query: text, action: "sendMessage_noAI" });
     }
 
     chatMessages.scrollTop = chatMessages.scrollHeight;
 }
-window.sendWithText = async function(text) {
-    const { userInput } = getElements();
-    if (userInput) userInput.value = text;
-    await window.sendMessage();
-};
-function appendMessage(content, sender) {
-    const { chatMessages } = getElements();
+
+function appendMessage_noAI(content, sender) {
+    const { chatMessages } = getElements_noAI();
     if (!chatMessages) return null;
 
     const msgDiv = document.createElement('div');
@@ -83,9 +79,9 @@ function appendMessage(content, sender) {
     return msgDiv.id;
 }
 
-async function findBestFaqMatch(query) {
+async function findBestFaqMatch_noAI(query) {
     try {
-        const queryTokens = cleanAndTokenize(query);
+        const queryTokens = cleanAndTokenize_noAI(query);
         const querySnapshot = await db.collection("faq_knowledge_base").get();
         
         let bestMatch = {
@@ -99,7 +95,7 @@ async function findBestFaqMatch(query) {
             const dbQuestion = data.question || "";
             const dbAnswer = data.answer || "";
             
-            const targetTokens = new Set([...cleanAndTokenize(dbQuestion), ...cleanAndTokenize(dbAnswer)]);
+            const targetTokens = new Set([...cleanAndTokenize_noAI(dbQuestion), ...cleanAndTokenize_noAI(dbAnswer)]);
             
             let matchScore = 0;
             queryTokens.forEach(token => {
@@ -126,12 +122,12 @@ async function findBestFaqMatch(query) {
 
         return bestMatch;
     } catch (error) {
-        logFaqError(error, { query, action: "findBestFaqMatch" });
+        logFaqError_noAI(error, { query, action: "findBestFaqMatch_noAI" });
         throw error;
     }
 }
 
-function cleanAndTokenize(text) {
+function cleanAndTokenize_noAI(text) {
     const stopWords = new Set(['is', 'the', 'a', 'an', 'and', 'or', 'to', 'in', 'on', 'of', 'how', 'what', 'do', 'i']);
     return text.toLowerCase()
                .replace(/[^\w\s]/gi, '')
@@ -139,7 +135,7 @@ function cleanAndTokenize(text) {
                .filter(word => word.length > 1 && !stopWords.has(word));
 }
 
-async function logFaqError(error, additionalContext = {}) {
+async function logFaqError_noAI(error, additionalContext = {}) {
     try {
         await db.collection("error_logs").add({
             timestamp: firebase.firestore.FieldValue.serverTimestamp(),
@@ -154,24 +150,3 @@ async function logFaqError(error, additionalContext = {}) {
         console.error("Failed to write error log to Firestore:", loggingErr);
     }
 }
-// Expose a safe client-side fallback handler for faq.html
-window.fetchClientSideFaq = async function(questionText, loadingElem) {
-    try {
-        const replyData = await findBestFaqMatch(questionText);
-        
-        if (loadingElem) loadingElem.remove();
-        appendMessage(replyData.answer, 'bot');
-
-        // Increment display_count in Firestore
-        if (replyData.docId) {
-            await db.collection("faq_knowledge_base").doc(replyData.docId).update({
-                display_count: firebase.firestore.FieldValue.increment(1)
-            });
-        }
-    } catch (error) {
-        console.error("Client-side fallback error:", error);
-        if (loadingElem) loadingElem.remove();
-        appendMessage("Sorry, I encountered an issue connecting to the knowledge base.", 'bot');
-        logFaqError(error, { query: questionText, action: "clientSideFallback" });
-    }
-};
