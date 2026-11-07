@@ -142,7 +142,7 @@ async function submitQuestion(questionText) {
         }
 
         const data = await response.json();
-        
+        console.warn(`alka3: data.answer=${data.answer}`);
         // Render Cloud Run answer and optional source link (expecting data.answer and data.source)
         setBotMessageContent(
             loadingDiv, 
@@ -153,8 +153,8 @@ async function submitQuestion(questionText) {
     } catch (error) {
         console.warn("Cloud Run backend unreachable. Falling back to client-side FAQ bot...", error);
         // FALLBACK: If Cloud Run fetch fails, invoke client-side fallback from faq_bot.js
-        if (typeof window.fetchClientSideFaq === 'function') {
-            await window.fetchClientSideFaq(questionText, loadingDiv);
+        if (typeof window.sendMessage_noAI === 'function') {
+            await window.sendMessage_noAI();
         } else {
             loadingDiv.textContent = "Sorry, I encountered an error connecting to the backend.";
         }
