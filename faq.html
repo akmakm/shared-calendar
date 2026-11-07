@@ -125,7 +125,7 @@ async function submitQuestion(questionText) {
     chatMessages.scrollTop = chatMessages.scrollHeight;
 
     try {
-                logFaqError_noAI(null, "<await fetch(CLOUD_FUNCTION_URL)");
+        console.warn(`alka1: <await fetch(CLOUD_FUNCTION_URL)`);
         const response = await fetch(CLOUD_FUNCTION_URL, {
             method: 'POST',
             headers: {
@@ -136,7 +136,7 @@ async function submitQuestion(questionText) {
                 language: 'en'
             })
         });
-                logFaqError_noAI(null, response);
+        console.warn(`alka2: response=${response.status}`);
         if (!response.ok) {
             throw new Error(`Server returned status: ${response.status}`);
         }
@@ -152,7 +152,6 @@ async function submitQuestion(questionText) {
 
     } catch (error) {
         console.warn("Cloud Run backend unreachable. Falling back to client-side FAQ bot...", error);
-logFaqError_noAI(error, "Cloud Run backend unreachable. Falling back to client-side FAQ bot...");
         // FALLBACK: If Cloud Run fetch fails, invoke client-side fallback from faq_bot.js
         if (typeof window.fetchClientSideFaq === 'function') {
             await window.fetchClientSideFaq(questionText, loadingDiv);
