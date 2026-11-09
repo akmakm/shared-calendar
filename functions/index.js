@@ -4,103 +4,23 @@ import * as logger from "firebase-functions/logger";
 import { GoogleGenAI } from "@google/genai";
 import { initializeApp, getApps } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
+import express from "express";
+import cors from "cors";
+import axios from "axios";
 
-const geminiApiKey = defineSecret("GEMINI_API_KEY");
+// Initialize Firebase Admin
 if (!getApps().length) {
     initializeApp();
 }
 const db = getFirestore();
 
-export const askFaq = onRequest({ secrets: [geminiApiKey] }, async (req, res) => {
-    // Set explicit wildcard headers for cross-origin frontend requests
-    res.set("Access-Control-Allow-Origin", "*");
-    res.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    res.set("Access-Control-Allow-Headers", "Content-Type, Authorization");
-    res.set("Access-Control-Max-Age", "3600");
+// Define Gemini API Key Secret
+const geminiApiKey = defineSecret("GEMINI_API_KEY");
+const fbPageAccessToken = defineSecret("FB_PAGE_ACCESS_TOKEN");
+const fbVerifyToken = defineSecret("FB_VERIFY_TOKEN");
 
-    // Handle preflight OPTIONS request immediately
-    if (req.method === "OPTIONS") {
-        res.status(204).send("");
-        return;
-    }
-
-    if (req.method !== "POST") {
-        res.status(405).json({ error: "Method Not Allowed" });
-        return;
-    }
-
-    try {
-        const { question, language } = req.body || {};
-        if (!question) {
-            res.status(400).json({ error: "Question is required." });
-            return;
-        }
-
-        const ai = new GoogleGenAI({ apiKey: geminiApiKey.value() });
-
-        logger.info(`Processing query: "${question}" in language: "${language || 'en'}"`);
-
-        const snapshot = await db.collection("faq_knowledge_base").get();
-        let docs = [];
-        snapshot.forEach(doc => docs.push(doc.data()));
-        // 1. Include sources clearly inside the context block
-        const contextText = docs.map((d, index) => 
-            `[Item ${index + 1}]
-            Question: ${d.question}
-            Answer: ${d.answer}
-            Source: ${d.source || 'None'}`
-       ).join("\n\n");
-
-       const prompt = `You are an official Petanque FAQ assistant.
-       Use the context below to answer the question.
-       Select the exact Source URL from the matching FAQ context item if available. If no specific source applies, return null for source.
-       If the answer cannot be found in the context, use your general knowledge about Petanque rules, and then select for source a relevant URL.
-       Respond in the language specified by the language code: '${language || 'en'}'.
-
-       Context:
-       ${contextText}
-
-       User Question: ${question}
-
-       Return your response strictly as a JSON object with this format:
-       {
-         "answer": "Your detailed answer here...",
-         "source": "https://..." or null
-       }`;
-
-       const chatResponse = await ai.models.generateContent({
-           model: "gemini-flash-lite-latest",
-           contents: prompt,
-           config: {
-               responseMimeType: "application/json" // Enforces pure JSON output
-           }
-       });
-
-       // 2. Parse the JSON response safely
-       let result = { answer: chatResponse.text, source: null };
-       try {
-           result = JSON.parse(chatResponse.text);
-       } catch (err) {
-           logger.error("Failed to parse JSON response from Gemini", err);
-       }
-
-       // 3. Send to frontend (matches faq.html expectation)
-       res.status(200).json({
-           answer: result.answer,
-           source: result.source
-       });
-
-    } catch (error) {
-        logger.error("Error in askFaq function:", error);
-        res.status(500).json({ error: "Failed to generate answer." });
-    }
-});
-
-import express from "express";
-import cors from "cors";
-import axios from "axios";
-import admin from "firebase-admin";
 const app = express();
+
 // Enable CORS for your domain and local development
 app.use(cors({
     origin: [
@@ -113,11 +33,68 @@ app.use(cors({
 }));
 app.use(express.json());
 
-// --- Core Shared FAQ Handler (stub for your existing RAG/FAQ logic) ---
-async function getFAQAnswer(questionText) {
-    // Replace or connect this with your actual FAQ/AI processing function
-    // Example: query your Firestore or vector search knowledge base
-    return `Answer to: "${questionText}"`;
+// --- Core AI Answer Generator (Shared by Web API & Messenger) ---
+async function generateAiAnswer(question, language = 'en') {
+    try {
+        const ai = new GoogleGenAI({ apiKey: geminiApiKey.value() });
+
+        logger.info(`Processing query: "${question}" in language: "${language}"`);
+
+        const snapshot = await db.collection("faq_knowledge_base").get();
+        let docs = [];
+        snapshot.forEach(doc => docs.push(doc.data()));
+
+        const contextText = docs.map((d, index) => 
+            `[Item ${index + 1}]
+            Question: ${d.question}
+            Answer: ${d.answer}
+            Source: ${d.source || 'None'}`
+       ).join("\n\n");
+
+       const prompt = `You are an official Petanque FAQ assistant.
+Use the context below to answer the question.
+Select the exact Source URL from the matching FAQ context item if available. If no specific source applies, return null for source.
+If the answer cannot be found in the context, use your general knowledge about Petanque rules, and then select for source a relevant URL.
+Respond in the language specified by the language code: '${language}'.
+
+Context:
+${contextText}
+
+User Question: ${question}
+
+Return your response strictly as a JSON object with this format:
+{
+  "answer": "Your detailed answer here...",
+  "source": "https://..." or null
+}`;
+
+       const chatResponse = await ai.models.generateContent({
+           model: "gemini-flash-lite-latest",
+           contents: prompt,
+           config: {
+               responseMimeType: "application/json"
+           }
+       });
+
+       let result = { answer: chatResponse.text, source: null };
+       try {
+           result = JSON.parse(chatResponse.text);
+       } catch (err) {
+           logger.error("Failed to parse JSON response from Gemini", err);
+       }
+
+       return {
+           answer: result.answer,
+           source: result.source
+       };
+
+    } catch (error) {
+        logger.error("Error generating AI answer:", error);
+        return {
+            answer: "Sorry, I encountered an error connecting to the AI knowledge base.",
+            source: null
+        };
+    }
 }
 
 // ==========================================
@@ -125,13 +102,14 @@ async function getFAQAnswer(questionText) {
 // ==========================================
 app.post('/', async (req, res) => {
     const questionText = req.body.question || req.body.text || "";
+    const language = req.body.language || 'en';
+
     if (!questionText.trim()) {
         return res.status(400).json({ error: "Question is required" });
     }
 
-    const result = await getFAQAnswer(questionText);
+    const result = await generateAiAnswer(questionText, language);
     
-    // Returns JSON containing both answer and source for faq.html
     res.json({
         answer: result.answer,
         source: result.source
@@ -139,12 +117,10 @@ app.post('/', async (req, res) => {
 });
 
 // ==========================================
-// 3. FACEBOOK MESSENGER WEBHOOK ROUTES
+// 2. FACEBOOK MESSENGER WEBHOOK ROUTES
 // ==========================================
-// Meta verification challenge (GET)
 app.get('/messenger-webhook', (req, res) => {
     const VERIFY_TOKEN = process.env.FB_VERIFY_TOKEN;
-    
     const mode = req.query['hub.mode'];
     const token = req.query['hub.verify_token'];
     const challenge = req.query['hub.challenge'];
@@ -156,27 +132,38 @@ app.get('/messenger-webhook', (req, res) => {
     }
 });
 
-// Incoming messages handler (POST)
 app.post('/messenger-webhook', async (req, res) => {
     res.status(200).send('EVENT_RECEIVED');
 
     const body = req.body;
     if (body.object === 'page') {
         for (let entry of body.entry) {
-            const webhookEvent = entry.messaging[0];
-            const senderPsid = webhookEvent.sender.id;
+            if (entry.messaging && entry.messaging[0]) {
+                const webhookEvent = entry.messaging[0];
+                const senderPsid = webhookEvent.sender.id;
 
-            if (webhookEvent.message && webhookEvent.message.text) {
-                const userQuery = webhookEvent.message.text;
-                const answer = await getFAQAnswer(userQuery);
+                if (webhookEvent.message && webhookEvent.message.text) {
+                    const userQuery = webhookEvent.message.text;
+                    const result = await generateAiAnswer(userQuery, 'en');
 
-                // Send reply back via Meta Graph API
-                const PAGE_ACCESS_TOKEN = process.env.FB_PAGE_ACCESS_TOKEN;
-                await axios.post(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
-                    recipient: { id: senderPsid },
-                    message: { text: answer }
-                });
+                    let replyText = result.answer;
+                    if (result.source) {
+                        replyText += `\n\n🔗 Source: ${result.source}`;
+                    }
+
+                    const PAGE_ACCESS_TOKEN = process.env.FB_PAGE_ACCESS_TOKEN;
+                    await axios.post(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
+                        recipient: { id: senderPsid },
+                        message: { text: replyText }
+                    });
+                }
             }
         }
     }
 });
+
+// Export the Express app as a 2nd-gen Firebase Cloud Function with Secrets enabled
+// 2. Pass ALL secrets into the onRequest options array
+export const askFaq = onRequest({ 
+    secrets: [geminiApiKey, fbPageAccessToken, fbVerifyToken] 
+}, app);
