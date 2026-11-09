@@ -104,6 +104,9 @@ app.post('/', async (req, res) => {
     const questionText = req.body.question || req.body.text || "";
     const language = req.body.language || 'en';
 
+    // Log web request
+    logger.info("Web API request received", { question: questionText, language });
+
     if (!questionText.trim()) {
         return res.status(400).json({ error: "Question is required" });
     }
@@ -120,14 +123,18 @@ app.post('/', async (req, res) => {
 // 2. FACEBOOK MESSENGER WEBHOOK ROUTES
 // ==========================================
 app.get('/messenger-webhook', (req, res) => {
+    logger.info("Messenger webhook verification GET request received");
+
     const VERIFY_TOKEN = process.env.FB_VERIFY_TOKEN;
     const mode = req.query['hub.mode'];
     const token = req.query['hub.verify_token'];
     const challenge = req.query['hub.challenge'];
 
     if (mode && token && mode === 'subscribe' && token === VERIFY_TOKEN) {
+        logger.info("Messenger webhook verification successful");
         res.status(200).send(challenge);
     } else {
+        logger.warn("Messenger webhook verification failed: token mismatch or missing mode");
         res.sendStatus(403);
     }
 });
@@ -136,6 +143,8 @@ app.post('/messenger-webhook', async (req, res) => {
     res.status(200).send('EVENT_RECEIVED');
 
     const body = req.body;
+    logger.info("Messenger webhook POST event received", { object: body.object });
+
     if (body.object === 'page') {
         for (let entry of body.entry) {
             if (entry.messaging && entry.messaging[0]) {
@@ -144,6 +153,8 @@ app.post('/messenger-webhook', async (req, res) => {
 
                 if (webhookEvent.message && webhookEvent.message.text) {
                     const userQuery = webhookEvent.message.text;
+                    logger.info(`Messenger message processed for sender ${senderPsid}`, { query: userQuery });
+
                     const result = await generateAiAnswer(userQuery, 'en');
 
                     let replyText = result.answer;
@@ -156,6 +167,7 @@ app.post('/messenger-webhook', async (req, res) => {
                         recipient: { id: senderPsid },
                         message: { text: replyText }
                     });
+                    logger.info(`Messenger reply successfully sent to sender ${senderPsid}`);
                 }
             }
         }
@@ -163,7 +175,6 @@ app.post('/messenger-webhook', async (req, res) => {
 });
 
 // Export the Express app as a 2nd-gen Firebase Cloud Function with Secrets enabled
-// 2. Pass ALL secrets into the onRequest options array
 export const askFaq = onRequest({ 
     secrets: [geminiApiKey, fbPageAccessToken, fbVerifyToken] 
 }, app);
