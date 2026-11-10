@@ -34,11 +34,11 @@ app.use(cors({
 app.use(express.json());
 
 // --- Core AI Answer Generator (Shared by Web API & Messenger) ---
-async function generateAiAnswer(question, language = 'en') {
+async function generateAiAnswer(question, requestedLanguage = null) {
     try {
         const ai = new GoogleGenAI({ apiKey: geminiApiKey.value() });
 
-        logger.info(`Processing query: "${question}" in language: "${language}"`);
+        logger.info(`Processing query: "${question}" | Requested language: "${requestedLanguage || 'auto-detect'}"`);
 
         const snapshot = await db.collection("faq_knowledge_base").get();
         let docs = [];
@@ -51,11 +51,16 @@ async function generateAiAnswer(question, language = 'en') {
             Source: ${d.source || 'None'}`
        ).join("\n\n");
 
+       // Tell Gemini to respond in the requested language, or match the user's language automatically
+       const languageInstruction = requestedLanguage 
+           ? `Respond in the language specified by code: '${requestedLanguage}'.`
+           : `Detect the language of the User Question and respond in that EXACT same language.`;
+
        const prompt = `You are an official Petanque FAQ assistant.
 Use the context below to answer the question.
 Select the exact Source URL from the matching FAQ context item if available. If no specific source applies, return null for source.
 If the answer cannot be found in the context, use your general knowledge about Petanque rules, and then select for source a relevant URL.
-Respond in the language specified by the language code: '${language}'.
+${languageInstruction}
 
 Context:
 ${contextText}
@@ -155,7 +160,7 @@ app.post('/messenger-webhook', async (req, res) => {
                     const userQuery = webhookEvent.message.text;
                     logger.info(`Messenger message processed for sender ${senderPsid}`, { query: userQuery });
 
-                    const result = await generateAiAnswer(userQuery, 'en');
+                    const result = await generateAiAnswer(userQuery, null);
 
                     let replyText = result.answer;
                     if (result.source) {
