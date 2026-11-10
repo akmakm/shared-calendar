@@ -113,7 +113,10 @@ window.copyPageLink = function() {
     
     btn.innerText = (lang === 'fr') ? "Lien copié !" : 
                     (lang === 'bg') ? "Копирано!" : 
-                    (lang === 'sr') ? "Линк је копиран!" : "Copied!";
+                    (lang === 'sr') ? "Линк је копиран!" : 
+                    (lang === 'de') ? "Link kopiert!" :
+                    (lang === 'hu') ? "Link másolva!" :
+                    (lang === 'el') ? "Ο σύνδεσμος αντιγράφηκε!" : "Copied!";
                     
     setTimeout(() => { btn.innerText = origText; }, 2000);
 };
@@ -195,6 +198,63 @@ const translations = {
         card4Btn: "Копирај везу",
         previewTitle: "Преглед уживо",
         footerText: "Страница за дељени приступ календарима"
+    },
+    de: {
+        title: "Pétanque-Turniere in Bulgarien - Abonnieren und Synchronisieren",
+        mainHeading: "Pétanque-Turniere in Bulgarien",
+        subHeading: "Abonnieren Sie, um Termine automatisch auf Ihrem Smartphone oder Computer zu synchronisieren.",
+        card1Title: "Google Kalender",
+        card1Desc: "Mit einem Klick direkt zu Ihrem persönlichen Google-Konto hinzufügen.",
+        card1Btn: "Zu Google hinzufügen",
+        card2Title: "Apple & Outlook (Live-Sync)",
+        card2Desc: "Automatische Synchronisierung mit iOS, macOS oder Outlook über einen iCal-Link.",
+        card2Btn: "Abonnieren (iCal)",
+        card3Title: ".ICS-Datei herunterladen",
+        card3Desc: "Laden Sie eine statische Datei herunter, um Termine manuell in andere Apps zu importieren.",
+        card3Btn: ".ICS herunterladen",
+        card4Title: "Diese Seite teilen",
+        card4Desc: "Scannen Sie den QR-Code oder kopieren Sie den Link, um diese Seite auf Ihrem Mobilgerät zu öffnen.",
+        card4Btn: "Link kopieren",
+        previewTitle: "Live-Vorschau",
+        footerText: "Seite für den geteilten Kalenderzugriff"
+    },
+    hu: {
+        title: "Petanque versenyek Bulgáriában - Feliratkozás és szinkronizálás",
+        mainHeading: "Petanque versenyek Bulgáriában",
+        subHeading: "Iratkozzon fel, hogy az események automatikusan szinkronizálódjanak telefonjára vagy számítógépére.",
+        card1Title: "Google Naptár",
+        card1Desc: "Adja hozzá közvetlenül a személyes Google-fiókjához egy kattintással.",
+        card1Btn: "Hozzáadás a Google-hoz",
+        card2Title: "Apple & Outlook (Élő szinkron)",
+        card2Desc: "Automatikus szinkronizálás iOS, macOS vagy Outlook rendszerekkel iCal linken keresztül.",
+        card2Btn: "Feliratkozás (iCal)",
+        card3Title: ".ICS fájl letöltése",
+        card3Desc: "Töltsön le egy statikus fájlt az események kézi importálásához más alkalmazásokba.",
+        card3Btn: ".ICS letöltése",
+        card4Title: "Oldal megosztása",
+        card4Desc: "Olvassa be a QR-kódot vagy másolja ki a linket az oldal mobileszközön való megnyitásához.",
+        card4Btn: "Link másolása",
+        previewTitle: "Élő előnézet",
+        footerText: "Megosztott naptár hozzáférési oldal"
+    },
+    el: {
+        title: "Τουρνουά Πετάνκ στη Βουλγαρία - Εγγραφή και Συγχρονισμός",
+        mainHeading: "Τουρνουά Πετάνκ στη Βουλγαρία",
+        subHeading: "Εγγραφείτε για να συγχρονίζετε αυτόματα τα γεγονότα στο κινητό ή στον υπολογιστή σας.",
+        card1Title: "Ημερολόγιο Google",
+        card1Desc: "Προσθήκη απευθείας στον προσωπικό σας λογαριασμό Google με ένα κλικ.",
+        card1Btn: "Προσθήκη στο Google",
+        card2Title: "Apple & Outlook (Ζωντανός συγχρονισμός)",
+        card2Desc: "Αυτόματος συγχρονισμός σε iOS, macOS ή Outlook μέσω συνδέσμου iCal.",
+        card2Btn: "Εγγραφή (iCal)",
+        card3Title: "Λήψη αρχείου .ICS",
+        card3Desc: "Κατεβάστε ένα στατικό αρχείο για μη αυτόματη εισαγωγή γεγονότων σε άλλες εφαρμογές.",
+        card3Btn: "Λήψη .ICS",
+        card4Title: "Κοινοποίηση αυτής της σελίδας",
+        card4Desc: "Σαρώστε τον κωδικό QR ή αντιγράφηστε τον σύνδεσμο για να ανοίξετε αυτή τη σελίδα στη φορητή συσκευή σας.",
+        card4Btn: "Αντιγραφή συνδέσμου",
+        previewTitle: "Ζωντανή προεπισκόπηση",
+        footerText: "Σελίδα κοινόχρηστης πρόσβασης ημερολογίου"
     }
 };
 
