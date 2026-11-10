@@ -125,12 +125,14 @@ async function submitQuestion(questionText) {
     chatMessages.scrollTop = chatMessages.scrollHeight;
 
     try {
-        console.warn(`alka1: <await fetch(CLOUD_FUNCTION_URL)`);
+        console.warn(`alka1: POST (CLOUD_FUNCTION_URL) body: language===en, question=${questionText}`);
         const response = await fetch(CLOUD_FUNCTION_URL, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
+            // Language for search is EN, other options are in-flight translation 
+            // TODO: remove language auto-detection from AI prompt to FB web-hook
             body: JSON.stringify({
                 question: questionText,
                 language: 'en'
