@@ -144,59 +144,68 @@ app.get('/messenger-webhook', (req, res) => {
     }
 });
 
-// --- ADMIN PSID LIST ---
-// Replace with your actual PSID (found in Cloud Logs when you send a message)
+const axios = require('axios');
+
+// List of Admin PSIDs authorized to submit new FAQ pairs
 const ADMIN_PSIDS = [
-    "29472827892312783", // Alexander Kartomin's PSID for this Page
-    // Add additional admin PSIDs here as needed
+    "29472827892312783", // Alexander Kartomin's PSID
 ];
 
-// Helper: Extract URLs/Links from message text or attachments
-function extractSharedLink(messageObj) {
+// Helper: Extract shared URL and clean text from incoming Messenger payload
+function parseAdminMessage(messageObj) {
     let sharedLink = null;
+    let fallbackTitle = "";
 
-    // Check attachments (Facebook Shares usually come as fallback/share attachments)
+    // 1. Check for shared attachments (Messenger share/fallback payload)
     if (messageObj.attachments && messageObj.attachments.length > 0) {
         for (let att of messageObj.attachments) {
             if (att.payload && att.payload.url) {
                 sharedLink = att.payload.url;
-                break;
+            }
+            if (att.title) {
+                fallbackTitle = att.title;
             }
         }
     }
 
-    // Fallback: Check if message text contains an explicit http/https URL
+    // 2. Check text for URL fallback
     if (!sharedLink && messageObj.text) {
-        const urlMatch = messageObj.text.match(/(https?:\/\/[^\s]+)/g);
-        if (urlMatch && urlMatch.length > 0) {
-            sharedLink = urlMatch[0];
+        const match = messageObj.text.match(/(https?:\/\/[^\s]+)/g);
+        if (match) sharedLink = match[0];
+    }
+
+    // 3. Extract admin's answer text (removing the raw URL if embedded in text)
+    let adminAnswer = (messageObj.text || "").replace(/(https?:\/\/[^\s]+)/g, '').trim();
+
+    return { sharedLink, adminAnswer, fallbackTitle };
+}
+
+// Helper: Attempt to fetch post content/question text via Facebook Graph API
+async function fetchPostContent(sharedLink, fallbackTitle) {
+    const PAGE_ACCESS_TOKEN = process.env.FB_PAGE_ACCESS_TOKEN;
+
+    // Try extracting numeric post ID from standard FB URLs (e.g., posts/123456789 or fbid=123456789)
+    const postIdMatch = sharedLink ? sharedLink.match(/(?:posts|permalink|story_fbid|v)=?\/?:?([0-9_]+)/) : null;
+    
+    if (postIdMatch && postIdMatch[1]) {
+        try {
+            const postId = postIdMatch[1];
+            const graphRes = await axios.get(`https://graph.facebook.com/v18.0/${postId}`, {
+                params: {
+                    fields: 'message,story',
+                    access_token: PAGE_ACCESS_TOKEN
+                }
+            });
+            if (graphRes.data && (graphRes.data.message || graphRes.data.story)) {
+                return graphRes.data.message || graphRes.data.story;
+            }
+        } catch (err) {
+            logger.warn("Could not fetch post details via Graph API, falling back to attachment metadata", err.message);
         }
     }
 
-    return sharedLink;
-}
-
-// Helper: Search Firestore FAQ collection for a match
-async function findFaqMatch(queryText) {
-    if (!queryText) return null;
-    
-    // Clean query text (remove link from text if present)
-    const cleanQuery = queryText.replace(/(https?:\/\/[^\s]+)/g, '').trim().toLowerCase();
-
-    const snapshot = await db.collection("faq_knowledge_base").get();
-    let bestMatch = null;
-
-    snapshot.forEach(doc => {
-        const data = doc.data();
-        const q = (data.question || "").toLowerCase();
-        
-        // Exact match or primary substring match
-        if (cleanQuery && (q.includes(cleanQuery) || cleanQuery.includes(q))) {
-            bestMatch = { id: doc.id, ...data };
-        }
-    });
-
-    return bestMatch;
+    // Fallback to attachment title if Graph API lookup is restricted by group privacy
+    return fallbackTitle || "Question from shared post";
 }
 
 // --- Messenger Webhook Endpoint ---
@@ -213,52 +222,48 @@ app.post('/messenger-webhook', async (req, res) => {
 
                 if (!messageObj) continue;
 
-                const sharedLink = extractSharedLink(messageObj);
                 const isAdmin = ADMIN_PSIDS.includes(senderPsid);
-
-                logger.info(`Messenger event from PSID ${senderPsid} | IsAdmin: ${isAdmin} | SharedLink: ${sharedLink || 'None'}`);
+                const { sharedLink, adminAnswer, fallbackTitle } = parseAdminMessage(messageObj);
 
                 // =========================================================
-                // CONDITION: Both Admin & Shared Link are present
+                // ADMIN PAIRING FLOW: Link + Admin Answer Text
                 // =========================================================
                 if (isAdmin && sharedLink) {
-                    const userQuery = messageObj.text || "";
-                    const faqMatch = await findFaqMatch(userQuery);
+                    // Ensure the admin provided an answer along with the link
+                    if (!adminAnswer) {
+                        const PAGE_ACCESS_TOKEN = process.env.FB_PAGE_ACCESS_TOKEN;
+                        await axios.post(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
+                            recipient: { id: senderPsid },
+                            message: { text: "⚠️ Shared link received, but no answer text was included. Please send the link along with your answer in the same message." }
+                        });
+                        continue;
+                    }
+
+                    // 1. Get the Question text from the post
+                    const questionText = await fetchPostContent(sharedLink, fallbackTitle);
+
+                    // 2. Add directly to Firestore `faq_knowledge_base`
+                    const newFaqRef = await db.collection("faq_knowledge_base").add({
+                        question: questionText,
+                        answer: adminAnswer,
+                        source: sharedLink,
+                        createdBy: senderPsid,
+                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+
+                    // 3. Confirm back to Admin with details
+                    const confirmText = `✅ Added to FAQ Knowledge Base!\n\n📌 Question: "${questionText}"\n💡 Answer: "${adminAnswer}"\n🔗 Source: ${sharedLink}\n🆔 Doc ID: ${newFaqRef.id}`;
 
                     const PAGE_ACCESS_TOKEN = process.env.FB_PAGE_ACCESS_TOKEN;
+                    await axios.post(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
+                        recipient: { id: senderPsid },
+                        message: { text: confirmText }
+                    });
 
-                    if (faqMatch) {
-                        // MATCH FOUND: Respond with answer="found" and corresponding link/source
-                        const responseText = `answer="found"\nLink: ${faqMatch.source || faqMatch.url || 'No link attached to FAQ entry'}`;
-                        
-                        await axios.post(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
-                            recipient: { id: senderPsid },
-                            message: { text: responseText }
-                        });
-                        
-                        logger.info(`Admin forward matched FAQ [${faqMatch.id}] for PSID ${senderPsid}`);
-                    } else {
-                        // NOT FOUND: Record in Firestore under 'unmatched_forwarded_links'
-                        await db.collection("unmatched_forwarded_links").add({
-                            senderPsid: senderPsid,
-                            sharedLink: sharedLink,
-                            originalText: userQuery,
-                            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
-                            status: "pending_review"
-                        });
-
-                        const responseText = `No FAQ match found. The forwarded link has been recorded for review.`;
-                        
-                        await axios.post(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
-                            recipient: { id: senderPsid },
-                            message: { text: responseText }
-                        });
-
-                        logger.info(`Admin forward recorded in unmatched_forwarded_links for PSID ${senderPsid}`);
-                    }
+                    logger.info(`Admin ${senderPsid} saved new FAQ entry [${newFaqRef.id}]`);
                 } 
                 // =========================================================
-                // STANDARD BOT HANDLING (Non-admin or regular message)
+                // STANDARD USER / NON-ADMIN QUERY FLOW
                 // =========================================================
                 else if (messageObj.text) {
                     const result = await generateAiAnswer(messageObj.text, null);
