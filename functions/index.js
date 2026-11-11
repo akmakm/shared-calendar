@@ -144,35 +144,132 @@ app.get('/messenger-webhook', (req, res) => {
     }
 });
 
+// --- ADMIN PSID LIST ---
+// Replace with your actual PSID (found in Cloud Logs when you send a message)
+const ADMIN_PSIDS = [
+    "29472827892312783", // Alexander Kartomin's PSID for this Page
+    // Add additional admin PSIDs here as needed
+];
+
+// Helper: Extract URLs/Links from message text or attachments
+function extractSharedLink(messageObj) {
+    let sharedLink = null;
+
+    // Check attachments (Facebook Shares usually come as fallback/share attachments)
+    if (messageObj.attachments && messageObj.attachments.length > 0) {
+        for (let att of messageObj.attachments) {
+            if (att.payload && att.payload.url) {
+                sharedLink = att.payload.url;
+                break;
+            }
+        }
+    }
+
+    // Fallback: Check if message text contains an explicit http/https URL
+    if (!sharedLink && messageObj.text) {
+        const urlMatch = messageObj.text.match(/(https?:\/\/[^\s]+)/g);
+        if (urlMatch && urlMatch.length > 0) {
+            sharedLink = urlMatch[0];
+        }
+    }
+
+    return sharedLink;
+}
+
+// Helper: Search Firestore FAQ collection for a match
+async function findFaqMatch(queryText) {
+    if (!queryText) return null;
+    
+    // Clean query text (remove link from text if present)
+    const cleanQuery = queryText.replace(/(https?:\/\/[^\s]+)/g, '').trim().toLowerCase();
+
+    const snapshot = await db.collection("faq_knowledge_base").get();
+    let bestMatch = null;
+
+    snapshot.forEach(doc => {
+        const data = doc.data();
+        const q = (data.question || "").toLowerCase();
+        
+        // Exact match or primary substring match
+        if (cleanQuery && (q.includes(cleanQuery) || cleanQuery.includes(q))) {
+            bestMatch = { id: doc.id, ...data };
+        }
+    });
+
+    return bestMatch;
+}
+
+// --- Messenger Webhook Endpoint ---
 app.post('/messenger-webhook', async (req, res) => {
     res.status(200).send('EVENT_RECEIVED');
 
     const body = req.body;
-    logger.info("Messenger webhook POST event received", { object: body.object });
-
     if (body.object === 'page') {
         for (let entry of body.entry) {
             if (entry.messaging && entry.messaging[0]) {
                 const webhookEvent = entry.messaging[0];
                 const senderPsid = webhookEvent.sender.id;
+                const messageObj = webhookEvent.message;
 
-                if (webhookEvent.message && webhookEvent.message.text) {
-                    const userQuery = webhookEvent.message.text;
-                    logger.info(`Messenger message processed for sender ${senderPsid}`, { query: userQuery });
+                if (!messageObj) continue;
 
-                    const result = await generateAiAnswer(userQuery, null);
+                const sharedLink = extractSharedLink(messageObj);
+                const isAdmin = ADMIN_PSIDS.includes(senderPsid);
 
-                    let replyText = result.answer;
-                    if (result.source) {
-                        replyText += `\n\n🔗 Source: ${result.source}`;
+                logger.info(`Messenger event from PSID ${senderPsid} | IsAdmin: ${isAdmin} | SharedLink: ${sharedLink || 'None'}`);
+
+                // =========================================================
+                // CONDITION: Both Admin & Shared Link are present
+                // =========================================================
+                if (isAdmin && sharedLink) {
+                    const userQuery = messageObj.text || "";
+                    const faqMatch = await findFaqMatch(userQuery);
+
+                    const PAGE_ACCESS_TOKEN = process.env.FB_PAGE_ACCESS_TOKEN;
+
+                    if (faqMatch) {
+                        // MATCH FOUND: Respond with answer="found" and corresponding link/source
+                        const responseText = `answer="found"\nLink: ${faqMatch.source || faqMatch.url || 'No link attached to FAQ entry'}`;
+                        
+                        await axios.post(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
+                            recipient: { id: senderPsid },
+                            message: { text: responseText }
+                        });
+                        
+                        logger.info(`Admin forward matched FAQ [${faqMatch.id}] for PSID ${senderPsid}`);
+                    } else {
+                        // NOT FOUND: Record in Firestore under 'unmatched_forwarded_links'
+                        await db.collection("unmatched_forwarded_links").add({
+                            senderPsid: senderPsid,
+                            sharedLink: sharedLink,
+                            originalText: userQuery,
+                            timestamp: firebase.firestore.FieldValue.serverTimestamp(),
+                            status: "pending_review"
+                        });
+
+                        const responseText = `No FAQ match found. The forwarded link has been recorded for review.`;
+                        
+                        await axios.post(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
+                            recipient: { id: senderPsid },
+                            message: { text: responseText }
+                        });
+
+                        logger.info(`Admin forward recorded in unmatched_forwarded_links for PSID ${senderPsid}`);
                     }
+                } 
+                // =========================================================
+                // STANDARD BOT HANDLING (Non-admin or regular message)
+                // =========================================================
+                else if (messageObj.text) {
+                    const result = await generateAiAnswer(messageObj.text, null);
+                    let replyText = result.answer;
+                    if (result.source) replyText += `\n\n🔗 ${result.source}`;
 
                     const PAGE_ACCESS_TOKEN = process.env.FB_PAGE_ACCESS_TOKEN;
                     await axios.post(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
                         recipient: { id: senderPsid },
                         message: { text: replyText }
                     });
-                    logger.info(`Messenger reply successfully sent to sender ${senderPsid}`);
                 }
             }
         }
