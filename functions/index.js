@@ -213,6 +213,10 @@ app.post('/messenger-webhook', async (req, res) => {
     res.status(200).send('EVENT_RECEIVED');
 
     const body = req.body;
+    
+    // 🔍 DEBUG: Log the full JSON payload so we can inspect where the link lives
+    logger.info("Full Webhook Payload:", JSON.stringify(body, null, 2));
+
     if (body.object === 'page') {
         for (let entry of body.entry) {
             if (entry.messaging && entry.messaging[0]) {
@@ -221,6 +225,9 @@ app.post('/messenger-webhook', async (req, res) => {
                 const messageObj = webhookEvent.message;
 
                 if (!messageObj) continue;
+
+                // Let's also log the specific message object
+                logger.info("Message Object Received:", JSON.stringify(messageObj, null, 2));
 
                 const isAdmin = ADMIN_PSIDS.includes(senderPsid);
                 const { sharedLink, adminAnswer, fallbackTitle } = parseAdminMessage(messageObj);
