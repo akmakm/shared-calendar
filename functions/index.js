@@ -211,9 +211,7 @@ async function fetchPostContent(sharedLink, fallbackTitle) {
 // --- Messenger Webhook Endpoint ---
 app.post('/messenger-webhook', async (req, res) => {
     res.status(200).send('EVENT_RECEIVED');
-
     const body = req.body;
-    
     // 🔍 DEBUG: Log the full JSON payload so we can inspect where the link lives
     logger.info("Full Webhook Payload:", JSON.stringify(body, null, 2));
 
@@ -228,28 +226,62 @@ app.post('/messenger-webhook', async (req, res) => {
 
                 // Let's also log the specific message object
                 logger.info("Message Object Received:", JSON.stringify(messageObj, null, 2));
-
                 const isAdmin = ADMIN_PSIDS.includes(senderPsid);
-                const { sharedLink, adminAnswer, fallbackTitle } = parseAdminMessage(messageObj);
+                const messageText = messageObj.text || "";
+
+                // 1. Extract link from text if pasted manually
+                let sharedLink = null;
+                const urlMatch = messageText.match(/(https?:\/\/[^\s]+)/g);
+                if (urlMatch) {
+                    sharedLink = urlMatch[0];
+                }
+
+                // 2. If not in text, check attachments (for native "Share" button)
+                if (!sharedLink && messageObj.attachments) {
+                    for (let att of messageObj.attachments) {
+                        if (att.payload && att.payload.url) {
+                            sharedLink = att.payload.url;
+                            break;
+                        }
+                    }
+                }
+
+                logger.info(`Incoming Messenger | PSID: ${senderPsid} | IsAdmin: ${isAdmin} | Link Found: ${sharedLink || 'None'} | Text: "${messageText}"`);
 
                 // =========================================================
-                // ADMIN PAIRING FLOW: Link + Admin Answer Text
+                // ADMIN LINK + ANSWER FLOW
                 // =========================================================
                 if (isAdmin && sharedLink) {
-                    // Ensure the admin provided an answer along with the link
+                    // The admin's answer is whatever text they typed, minus the pasted link
+                    const adminAnswer = messageText.replace(/(https?:\/\/[^\s]+)/g, '').trim();
+
                     if (!adminAnswer) {
                         const PAGE_ACCESS_TOKEN = process.env.FB_PAGE_ACCESS_TOKEN;
                         await axios.post(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
                             recipient: { id: senderPsid },
-                            message: { text: "⚠️ Shared link received, but no answer text was included. Please send the link along with your answer in the same message." }
+                            message: { text: "⚠️ Please include your answer text along with the link in your message." }
                         });
                         continue;
                     }
 
-                    // 1. Get the Question text from the post
-                    const questionText = await fetchPostContent(sharedLink, fallbackTitle);
+                    // Try fetching the post text via Graph API
+                    let questionText = "Question from shared post";
+                    const postIdMatch = sharedLink.match(/(?:posts|permalink|story_fbid|v)=?\/?:?([0-9_]+)/);
+                    if (postIdMatch && postIdMatch[1]) {
+                        try {
+                            const PAGE_ACCESS_TOKEN = process.env.FB_PAGE_ACCESS_TOKEN;
+                            const graphRes = await axios.get(`https://graph.facebook.com/v18.0/${postIdMatch[1]}`, {
+                                params: { fields: 'message,story', access_token: PAGE_ACCESS_TOKEN }
+                            });
+                            if (graphRes.data?.message || graphRes.data?.story) {
+                                questionText = graphRes.data.message || graphRes.data.story;
+                            }
+                        } catch (err) {
+                            logger.warn("Could not fetch Graph API post text, using fallback.", err.message);
+                        }
+                    }
 
-                    // 2. Add directly to Firestore `faq_knowledge_base`
+                    // Save directly to Firestore faq_knowledge_base
                     const newFaqRef = await db.collection("faq_knowledge_base").add({
                         question: questionText,
                         answer: adminAnswer,
@@ -258,22 +290,20 @@ app.post('/messenger-webhook', async (req, res) => {
                         timestamp: firebase.firestore.FieldValue.serverTimestamp()
                     });
 
-                    // 3. Confirm back to Admin with details
-                    const confirmText = `✅ Added to FAQ Knowledge Base!\n\n📌 Question: "${questionText}"\n💡 Answer: "${adminAnswer}"\n🔗 Source: ${sharedLink}\n🆔 Doc ID: ${newFaqRef.id}`;
-
+                    // Confirm to Admin
                     const PAGE_ACCESS_TOKEN = process.env.FB_PAGE_ACCESS_TOKEN;
                     await axios.post(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
                         recipient: { id: senderPsid },
-                        message: { text: confirmText }
+                        message: { text: `✅ FAQ Saved!\n\nQ: ${questionText}\nA: ${adminAnswer}\n🔗 ${sharedLink}` }
                     });
 
-                    logger.info(`Admin ${senderPsid} saved new FAQ entry [${newFaqRef.id}]`);
+                    logger.info(`Successfully added FAQ [${newFaqRef.id}] from admin link.`);
                 } 
                 // =========================================================
-                // STANDARD USER / NON-ADMIN QUERY FLOW
+                // STANDARD BOT QUERY FLOW
                 // =========================================================
-                else if (messageObj.text) {
-                    const result = await generateAiAnswer(messageObj.text, null);
+                else if (messageText) {
+                    const result = await generateAiAnswer(messageText, null);
                     let replyText = result.answer;
                     if (result.source) replyText += `\n\n🔗 ${result.source}`;
 
