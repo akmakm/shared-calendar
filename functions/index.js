@@ -144,8 +144,6 @@ app.get('/messenger-webhook', (req, res) => {
     }
 });
 
-const axios = require('axios');
-
 // List of Admin PSIDs authorized to submit new FAQ pairs
 const ADMIN_PSIDS = [
     "29472827892312783", // Alexander Kartomin's PSID
