@@ -221,91 +221,77 @@ app.post('/messenger-webhook', async (req, res) => {
                 const messageObj = webhookEvent.message;
 
                 if (!messageObj) continue;
-
                 // Let's also log the specific message object
                 logger.info("Message Object Received:", JSON.stringify(messageObj, null, 2));
                 const isAdmin = ADMIN_PSIDS.includes(senderPsid);
                 const messageText = messageObj.text || "";
-
-                // 1. Extract link from text if pasted manually
-                let sharedLink = null;
-                const urlMatch = messageText.match(/(https?:\/\/[^\s]+)/g);
-                if (urlMatch) {
-                    sharedLink = urlMatch[0];
-                }
-
-                // 2. If not in text, check attachments (for native "Share" button)
-                if (!sharedLink && messageObj.attachments) {
-                    for (let att of messageObj.attachments) {
-                        if (att.payload && att.payload.url) {
-                            sharedLink = att.payload.url;
-                            break;
-                        }
-                    }
-                }
-
-                logger.info(`Incoming Messenger | PSID: ${senderPsid} | IsAdmin: ${isAdmin} | Link Found: ${sharedLink || 'None'} | Text: "${messageText}"`);
+                const PAGE_ACCESS_TOKEN = process.env.FB_PAGE_ACCESS_TOKEN;
+                const adminPendingRef = db.collection('admin_pending_faq').doc(senderPsid);
 
                 // =========================================================
-                // ADMIN LINK + ANSWER FLOW
+                // TWO-STEP FLOW: STEP 2 (Admin replying with the Question text)
                 // =========================================================
-                if (isAdmin && sharedLink) {
-                    // The admin's answer is whatever text they typed, minus the pasted link
-                    const adminAnswer = messageText.replace(/(https?:\/\/[^\s]+)/g, '').trim();
+                if (isAdmin) {
+                    const pendingDoc = await adminPendingRef.get();
+                    if (pendingDoc.exists && messageText) {
+                        const pendingData = pendingDoc.data();
+                        const questionText = messageText;
+                        const answerText = pendingData.answer;
 
-                    if (!adminAnswer) {
-                        const PAGE_ACCESS_TOKEN = process.env.FB_PAGE_ACCESS_TOKEN;
+                        // Save complete entry to faq_knowledge_base
+                        const newFaqRef = await db.collection("faq_knowledge_base").add({
+                            question: questionText,
+                            answer: answerText,
+                            source: "Facebook Native Share",
+                            createdBy: senderPsid,
+                            timestamp: admin.firestore.FieldValue.serverTimestamp()
+                        });
+
+                        // Clear the pending state
+                        await adminPendingRef.delete();
+
+                        // Confirm back to Admin
                         await axios.post(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
                             recipient: { id: senderPsid },
-                            message: { text: "⚠️ Please include your answer text along with the link in your message." }
+                            message: { text: `✅ FAQ Successfully Added!\n\n📌 Q: ${questionText}\n💡 A: ${answerText}\n🆔 ID: ${newFaqRef.id}` }
                         });
+
+                        logger.info(`Completed two-step FAQ addition [${newFaqRef.id}] for admin ${senderPsid}`);
                         continue;
                     }
+                }
 
-                    // Try fetching the post text via Graph API
-                    let questionText = "Question from shared post";
-                    const postIdMatch = sharedLink.match(/(?:posts|permalink|story_fbid|v)=?\/?:?([0-9_]+)/);
-                    if (postIdMatch && postIdMatch[1]) {
-                        try {
-                            const PAGE_ACCESS_TOKEN = process.env.FB_PAGE_ACCESS_TOKEN;
-                            const graphRes = await axios.get(`https://graph.facebook.com/v18.0/${postIdMatch[1]}`, {
-                                params: { fields: 'message,story', access_token: PAGE_ACCESS_TOKEN }
-                            });
-                            if (graphRes.data?.message || graphRes.data?.story) {
-                                questionText = graphRes.data.message || graphRes.data.story;
-                            }
-                        } catch (err) {
-                            logger.warn("Could not fetch Graph API post text, using fallback.", err.message);
-                        }
-                    }
+                // =========================================================
+                // TWO-STEP FLOW: STEP 1 (Admin sharing a post with an Answer)
+                // =========================================================
+                const hasAttachments = messageObj.attachments && messageObj.attachments.length > 0;
+                if (isAdmin && hasAttachments && messageText) {
+                    const answerText = messageText;
 
-                    // Save directly to Firestore faq_knowledge_base
-                    const newFaqRef = await db.collection("faq_knowledge_base").add({
-                        question: questionText,
-                        answer: adminAnswer,
-                        source: sharedLink,
-                        createdBy: senderPsid,
-                        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                    // Store pending answer in Firestore
+                    await adminPendingRef.set({
+                        answer: answerText,
+                        timestamp: admin.firestore.FieldValue.serverTimestamp()
                     });
 
-                    // Confirm to Admin
-                    const PAGE_ACCESS_TOKEN = process.env.FB_PAGE_ACCESS_TOKEN;
+                    // Prompt admin for the question text
                     await axios.post(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
                         recipient: { id: senderPsid },
-                        message: { text: `✅ FAQ Saved!\n\nQ: ${questionText}\nA: ${adminAnswer}\n🔗 ${sharedLink}` }
+                        message: { text: "💡 Answer recorded! Now, please reply with the **question text** (or description) for this post to finish adding it to the FAQ." }
                     });
 
-                    logger.info(`Successfully added FAQ [${newFaqRef.id}] from admin link.`);
-                } 
+                    logger.info(`Stored pending FAQ answer for admin ${senderPsid}, waiting for question text.`);
+                    continue;
+                }
+
                 // =========================================================
-                // STANDARD BOT QUERY FLOW
+                // STANDARD BOT QUERY FLOW (Non-admin or regular message)
                 // =========================================================
-                else if (messageText) {
+                if (messageText && !isAdmin) {
                     const result = await generateAiAnswer(messageText, null);
                     let replyText = result.answer;
                     if (result.source) replyText += `\n\n🔗 ${result.source}`;
 
-                    const PAGE_ACCESS_TOKEN = process.env.FB_PAGE_ACCESS_TOKEN;
                     await axios.post(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
                         recipient: { id: senderPsid },
                         message: { text: replyText }
