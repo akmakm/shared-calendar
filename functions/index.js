@@ -4,7 +4,6 @@ import * as logger from "firebase-functions/logger";
 import { GoogleGenAI } from "@google/genai";
 import { initializeApp, getApps } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
-import { getFirestore } from "firebase-admin/firestore";
 import express from "express";
 import cors from "cors";
 import axios from "axios";
