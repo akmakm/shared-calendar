@@ -254,7 +254,7 @@ app.post('/messenger-webhook', async (req, res) => {
                         await adminPendingRef.set({
                             stage: 'awaiting_question',
                             answer: messageText,
-                            timestamp: admin.firestore.FieldValue.serverTimestamp()
+                            timestamp: FieldValue.serverTimestamp()
                         });
 
                         await axios.post(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
@@ -277,7 +277,7 @@ app.post('/messenger-webhook', async (req, res) => {
                             answer: answerText,
                             source: "Facebook Native Share",
                             createdBy: senderPsid,
-                            timestamp: admin.firestore.FieldValue.serverTimestamp()
+                            timestamp: FieldValue.serverTimestamp()
                         });
 
                         logger.info(`Successfully written FAQ to Firestore with ID: ${newFaqRef.id}`);
@@ -301,7 +301,7 @@ app.post('/messenger-webhook', async (req, res) => {
                         await adminPendingRef.set({
                             stage: 'awaiting_question',
                             answer: messageText,
-                            timestamp: admin.firestore.FieldValue.serverTimestamp()
+                            timestamp: FieldValue.serverTimestamp()
                         });
 
                         await axios.post(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
@@ -319,7 +319,7 @@ app.post('/messenger-webhook', async (req, res) => {
 
                         await adminPendingRef.set({
                             stage: 'awaiting_answer',
-                            timestamp: admin.firestore.FieldValue.serverTimestamp()
+                            timestamp: FieldValue.serverTimestamp()
                         });
                         continue;
                     }
