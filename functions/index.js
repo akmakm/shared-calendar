@@ -144,11 +144,6 @@ app.get('/messenger-webhook', (req, res) => {
     }
 });
 
-// List of Admin PSIDs authorized to submit new FAQ pairs
-const ADMIN_PSIDS = [
-    "29472827892312783", // Alexander Kartomin's PSID
-];
-
 // Helper: Extract shared URL and clean text from incoming Messenger payload
 function parseAdminMessage(messageObj) {
     let sharedLink = null;
@@ -207,87 +202,133 @@ async function fetchPostContent(sharedLink, fallbackTitle) {
 }
 
 // --- Messenger Webhook Endpoint ---
-app.post('/messenger-webhook', async (req, res) => {
-    res.status(200).send('EVENT_RECEIVED');
-    const body = req.body;
-    // 🔍 DEBUG: Log the full JSON payload so we can inspect where the link lives
-    logger.info("Full Webhook Payload:", JSON.stringify(body, null, 2));
+// List of Admin PSIDs authorized to submit new FAQ pairs
+const ADMIN_PSIDS = [
+    "29472827892312783", // Alexander Kartomin's PSID
+];
 
-    if (body.object === 'page') {
-        for (let entry of body.entry) {
-            if (entry.messaging && entry.messaging[0]) {
+app.post('/messenger-webhook', async (req, res) => {
+    const body = req.body;
+    const PAGE_ACCESS_TOKEN = process.env.FB_PAGE_ACCESS_TOKEN;
+
+    logger.info("=== WEBHOOK REQUEST RECEIVED ===", { 
+        object: body.object,
+        entryCount: body.entry?.length || 0 
+    });
+
+    try {
+        if (body.object === 'page') {
+            for (const entry of body.entry) {
+                if (!entry.messaging || !entry.messaging[0]) continue;
+
                 const webhookEvent = entry.messaging[0];
-                const senderPsid = webhookEvent.sender.id;
+                const senderPsid = webhookEvent.sender?.id;
                 const messageObj = webhookEvent.message;
 
-                if (!messageObj) continue;
-                // Let's also log the specific message object
-                logger.info("Message Object Received:", JSON.stringify(messageObj, null, 2));
+                if (!messageObj || messageObj.is_echo || !senderPsid) {
+                    logger.info("Skipping event: Echo message, missing message object, or missing sender ID.", { senderPsid, isEcho: messageObj?.is_echo });
+                    continue;
+                }
+
                 const isAdmin = ADMIN_PSIDS.includes(senderPsid);
-                const messageText = messageObj.text || "";
-                const PAGE_ACCESS_TOKEN = process.env.FB_PAGE_ACCESS_TOKEN;
+                const messageText = (messageObj.text || "").trim();
+                const hasAttachments = Array.isArray(messageObj.attachments) && messageObj.attachments.length > 0;
                 const adminPendingRef = db.collection('admin_pending_faq').doc(senderPsid);
 
-                // =========================================================
-                // TWO-STEP FLOW: STEP 2 (Admin replying with the Question text)
-                // =========================================================
+                logger.info("Parsed Incoming Message", { 
+                    senderPsid, 
+                    isAdmin, 
+                    hasAttachments, 
+                    messageTextLength: messageText.length,
+                    rawText: messageText 
+                });
+
                 if (isAdmin) {
                     const pendingDoc = await adminPendingRef.get();
-                    if (pendingDoc.exists && messageText) {
-                        const pendingData = pendingDoc.data();
-                        const questionText = messageText;
-                        const answerText = pendingData.answer;
+                    logger.info("Checked pending FAQ state for admin", { exists: pendingDoc.exists, data: pendingDoc.exists ? pendingDoc.data() : null });
 
-                        // Save complete entry to faq_knowledge_base
+                    // CASE A: Admin already shared an attachment without text, now sending the Answer
+                    if (pendingDoc.exists && pendingDoc.data().stage === 'awaiting_answer' && messageText) {
+                        logger.info("Admin matched CASE A: Received answer text for pending attachment.");
+                        
+                        await adminPendingRef.set({
+                            stage: 'awaiting_question',
+                            answer: messageText,
+                            timestamp: admin.firestore.FieldValue.serverTimestamp()
+                        });
+
+                        await axios.post(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
+                            recipient: { id: senderPsid },
+                            message: { text: "💡 Answer recorded! Now reply with the question text to save it to the FAQ." }
+                        });
+                        
+                        logger.info("Successfully sent reply for CASE A.");
+                        continue;
+                    }
+
+                    // CASE B: Step 2 — Answer is saved, admin is now sending the Question text
+                    if (pendingDoc.exists && pendingDoc.data().stage === 'awaiting_question' && messageText) {
+                        logger.info("Admin matched CASE B: Received question text. Finalizing FAQ entry.");
+                        
+                        const answerText = pendingDoc.data().answer;
+
                         const newFaqRef = await db.collection("faq_knowledge_base").add({
-                            question: questionText,
+                            question: messageText,
                             answer: answerText,
                             source: "Facebook Native Share",
                             createdBy: senderPsid,
                             timestamp: admin.firestore.FieldValue.serverTimestamp()
                         });
 
-                        // Clear the pending state
-                        await adminPendingRef.delete();
+                        logger.info(`Successfully written FAQ to Firestore with ID: ${newFaqRef.id}`);
 
-                        // Confirm back to Admin
+                        await adminPendingRef.delete();
+                        logger.info("Cleaned up pending FAQ document.");
+
                         await axios.post(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
                             recipient: { id: senderPsid },
-                            message: { text: `✅ FAQ Successfully Added!\n\n📌 Q: ${questionText}\n💡 A: ${answerText}\n🆔 ID: ${newFaqRef.id}` }
+                            message: { text: `✅ FAQ Saved!\n\n📌 Q: ${messageText}\n💡 A: ${answerText}\n🆔 ID: ${newFaqRef.id}` }
                         });
 
-                        logger.info(`Completed two-step FAQ addition [${newFaqRef.id}] for admin ${senderPsid}`);
+                        logger.info("Successfully sent confirmation for CASE B.");
+                        continue;
+                    }
+
+                    // CASE C: Step 1 — Admin shared a post with attachment + answer in the same event
+                    if (hasAttachments && messageText) {
+                        logger.info("Admin matched CASE C: Received attachment + answer text simultaneously.");
+
+                        await adminPendingRef.set({
+                            stage: 'awaiting_question',
+                            answer: messageText,
+                            timestamp: admin.firestore.FieldValue.serverTimestamp()
+                        });
+
+                        await axios.post(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
+                            recipient: { id: senderPsid },
+                            message: { text: "💡 Answer recorded! Now reply with the question text to save it to the FAQ." }
+                        });
+
+                        logger.info("Successfully sent prompt for CASE C.");
+                        continue;
+                    }
+
+                    // CASE D: Step 1 (Split event) — Admin shared a post, attachment arrived first without text
+                    if (hasAttachments && !messageText) {
+                        logger.info("Admin matched CASE D: Received attachment without text. Setting awaiting_answer stage.");
+
+                        await adminPendingRef.set({
+                            stage: 'awaiting_answer',
+                            timestamp: admin.firestore.FieldValue.serverTimestamp()
+                        });
                         continue;
                     }
                 }
 
-                // =========================================================
-                // TWO-STEP FLOW: STEP 1 (Admin sharing a post with an Answer)
-                // =========================================================
-                const hasAttachments = messageObj.attachments && messageObj.attachments.length > 0;
-                if (isAdmin && hasAttachments && messageText) {
-                    const answerText = messageText;
+                // STANDARD QUERY FLOW (Regular users, or Admin asking a normal question without sharing)
+                if (messageText) {
+                    logger.info("Routing message to standard AI query handler.", { senderPsid, isAdmin });
 
-                    // Store pending answer in Firestore
-                    await adminPendingRef.set({
-                        answer: answerText,
-                        timestamp: admin.firestore.FieldValue.serverTimestamp()
-                    });
-
-                    // Prompt admin for the question text
-                    await axios.post(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
-                        recipient: { id: senderPsid },
-                        message: { text: "💡 Answer recorded! Now, please reply with the **question text** (or description) for this post to finish adding it to the FAQ." }
-                    });
-
-                    logger.info(`Stored pending FAQ answer for admin ${senderPsid}, waiting for question text.`);
-                    continue;
-                }
-
-                // =========================================================
-                // STANDARD BOT QUERY FLOW (Non-admin or regular message)
-                // =========================================================
-                if (messageText && !isAdmin) {
                     const result = await generateAiAnswer(messageText, null);
                     let replyText = result.answer;
                     if (result.source) replyText += `\n\n🔗 ${result.source}`;
@@ -296,10 +337,21 @@ app.post('/messenger-webhook', async (req, res) => {
                         recipient: { id: senderPsid },
                         message: { text: replyText }
                     });
+
+                    logger.info("Successfully sent AI response to user.");
                 }
             }
         }
+    } catch (error) {
+        logger.error("CRITICAL ERROR processing Messenger webhook:", {
+            errorMessage: error.message,
+            errorStack: error.stack,
+            responseData: error.response?.data
+        });
     }
+
+    logger.info("=== WEBHOOK PROCESSING COMPLETE. SENDING 200 OK ===");
+    res.status(200).send('EVENT_RECEIVED');
 });
 
 // Export the Express app as a 2nd-gen Firebase Cloud Function with Secrets enabled
