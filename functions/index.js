@@ -105,75 +105,125 @@ Return your response strictly as a JSON object with this format:
 // ==========================================
 // 1. WEB APP API ENDPOINT (faq.html)
 // ==========================================
+// 1. Generate embedding using the exact same model used to populate faq_knowledge_base
+async function getEmbedding(text) {
+    const apiKey = process.env.GEMINI_API_KEY;
+    // Note: Verify this matches the model that created your stored vectors (e.g., text-embedding-004 or gemini-embedding-001)
+    const model = "text-embedding-004";
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:embedContent?key=${apiKey}`;
+
+    const response = await axios.post(url, {
+        model: `models/${model}`,
+        content: {
+            parts: [{ text: text.trim() }]
+        }
+    });
+
+    return response.data.embedding.values;
+}
+
+// 2. Cosine similarity between two numeric arrays
+function cosineSimilarity(vecA, vecB) {
+    if (!Array.isArray(vecA) || !Array.isArray(vecB) || vecA.length !== vecB.length) {
+        logger.warn("Vector dimension mismatch or invalid array", {
+            lenA: vecA?.length,
+            lenB: vecB?.length
+        });
+        return 0;
+    }
+
+    let dotProduct = 0;
+    let normA = 0;
+    let normB = 0;
+
+    for (let i = 0; i < vecA.length; i++) {
+        dotProduct += vecA[i] * vecB[i];
+        normA += vecA[i] * vecA[i];
+        normB += vecB[i] * vecB[i];
+    }
+
+    if (normA === 0 || normB === 0) return 0;
+    return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+
+// 3. Shared RAG search + display_count increment + AI fallback
+async function searchFaqWithRag(question, language = 'en') {
+    const SIMILARITY_THRESHOLD = 0.78;
+
+    logger.info("=== RAG VECTOR SEARCH STARTED ===", { question, language });
+
+    const queryEmbedding = await getEmbedding(question);
+    logger.info("Generated query embedding", { dimensions: queryEmbedding.length });
+
+    const snapshot = await db.collection("faq_knowledge_base").get();
+    logger.info(`Loaded ${snapshot.size} documents from faq_knowledge_base.`);
+
+    let bestMatch = null;
+    let highestSimilarity = -1;
+
+    for (const doc of snapshot.docs) {
+        const data = doc.data();
+        if (!Array.isArray(data.embedding) || data.embedding.length === 0) {
+            logger.warn(`Skipping FAQ doc [${doc.id}]: missing or empty embedding array.`);
+            continue;
+        }
+
+        const similarity = cosineSimilarity(queryEmbedding, data.embedding);
+        if (similarity > highestSimilarity) {
+            highestSimilarity = similarity;
+            bestMatch = { id: doc.id, ref: doc.ref, ...data };
+        }
+    }
+
+    logger.info("RAG vector scan finished", {
+        bestMatchId: bestMatch?.id || null,
+        bestMatchQuestion: bestMatch?.question || null,
+        highestSimilarity: Number(highestSimilarity.toFixed(4)),
+        threshold: SIMILARITY_THRESHOLD
+    });
+
+    if (bestMatch && highestSimilarity >= SIMILARITY_THRESHOLD) {
+        await bestMatch.ref.update({
+            display_count: FieldValue.increment(1),
+            last_displayed_at: FieldValue.serverTimestamp()
+        });
+
+        logger.info(`Confident RAG match [${bestMatch.id}]. Incremented display_count.`, {
+            previousCount: bestMatch.display_count || 0
+        });
+
+        return {
+            answer: bestMatch.answer,
+            source: bestMatch.source || bestMatch.sourceUrl || null,
+            matchType: "rag_database",
+            similarity: highestSimilarity
+        };
+    }
+
+    logger.info("No confident vector match in Firestore. Falling back to AI generation.", { highestSimilarity });
+    const aiResult = await generateAiAnswer(question, language);
+
+    return {
+        answer: aiResult.answer,
+        source: aiResult.source || null,
+        matchType: "ai_fallback",
+        similarity: highestSimilarity
+    };
+}
+
+// 4. Web UI endpoint (faq.html)
 app.post('/', async (req, res) => {
     const { question, language = 'en' } = req.body;
     if (!question) {
-        logger.warn("Hybrid Search rejected: Missing question in request body.");
+        logger.warn("Web search rejected: Missing question.");
         return res.status(400).json({ error: "Missing question" });
     }
 
     try {
-        logger.info("=== HYBRID SEARCH REQUEST RECEIVED ===", { question, language });
-
-        // 1. Fetch all documents from Firestore faq_knowledge_base
-        const snapshot = await db.collection("faq_knowledge_base").get();
-        logger.info(`Scanned ${snapshot.size} documents in faq_knowledge_base.`);
-
-        let bestMatch = null;
-        let highestScore = 0;
-        const CONFIDENCE_THRESHOLD = 0.6; // 60% keyword match requirement
-
-        snapshot.forEach(doc => {
-            const data = doc.data();
-            const score = calculateConfidence(question, data.question || "");
-            if (score > highestScore) {
-                highestScore = score;
-                bestMatch = { id: doc.id, ...data };
-            }
-        });
-
-        // 2. If confident match found in Firestore, increment display_count and return it directly
-        if (bestMatch && highestScore >= CONFIDENCE_THRESHOLD) {
-            logger.info("High-confidence match found in Firestore FAQ", {
-                matchId: bestMatch.id,
-                score: highestScore,
-                previousDisplayCount: bestMatch.display_count || 0
-            });
-
-            // Atomically increment display_count (initializes to 1 if missing)
-            await db.collection("faq_knowledge_base").doc(bestMatch.id).update({
-                display_count: FieldValue.increment(1),
-                last_displayed_at: FieldValue.serverTimestamp()
-            });
-
-            logger.info(`Incremented display_count for FAQ document [${bestMatch.id}]`);
-
-            return res.status(200).json({
-                answer: bestMatch.answer,
-                source: bestMatch.source || bestMatch.sourceUrl || null,
-                matchType: "database",
-                confidence: highestScore
-            });
-        }
-
-        // 3. Otherwise, fall back to AI search generator
-        logger.info("Low confidence or no match in Firestore. Falling back to AI search.", {
-            highestScore,
-            closestMatchId: bestMatch?.id || null
-        });
-
-        const aiResult = await generateAiAnswer(question, language);
-
-        logger.info("AI fallback completed successfully.", { hasSource: !!aiResult.source });
-
-        return res.status(200).json({
-            answer: aiResult.answer,
-            source: aiResult.source || null,
-            matchType: "ai_fallback"
-        });
-
+        const result = await searchFaqWithRag(question, language);
+        return res.status(200).json(result);
     } catch (error) {
-        logger.error("CRITICAL ERROR in hybrid search endpoint:", {
+        logger.error("CRITICAL ERROR in Web RAG search endpoint:", {
             errorMessage: error.message,
             errorStack: error.stack
         });
@@ -181,96 +231,18 @@ app.post('/', async (req, res) => {
     }
 });
 
-// ==========================================
-// 2. FACEBOOK MESSENGER WEBHOOK ROUTES
-// ==========================================
-app.get('/messenger-webhook', (req, res) => {
-    logger.info("Messenger webhook verification GET request received");
-
-    const VERIFY_TOKEN = process.env.FB_VERIFY_TOKEN;
-    const mode = req.query['hub.mode'];
-    const token = req.query['hub.verify_token'];
-    const challenge = req.query['hub.challenge'];
-
-    if (mode && token && mode === 'subscribe' && token === VERIFY_TOKEN) {
-        logger.info("Messenger webhook verification successful");
-        res.status(200).send(challenge);
-    } else {
-        logger.warn("Messenger webhook verification failed: token mismatch or missing mode");
-        res.sendStatus(403);
-    }
-});
-
-// Helper: Extract shared URL and clean text from incoming Messenger payload
-function parseAdminMessage(messageObj) {
-    let sharedLink = null;
-    let fallbackTitle = "";
-
-    // 1. Check for shared attachments (Messenger share/fallback payload)
-    if (messageObj.attachments && messageObj.attachments.length > 0) {
-        for (let att of messageObj.attachments) {
-            if (att.payload && att.payload.url) {
-                sharedLink = att.payload.url;
-            }
-            if (att.title) {
-                fallbackTitle = att.title;
-            }
-        }
-    }
-
-    // 2. Check text for URL fallback
-    if (!sharedLink && messageObj.text) {
-        const match = messageObj.text.match(/(https?:\/\/[^\s]+)/g);
-        if (match) sharedLink = match[0];
-    }
-
-    // 3. Extract admin's answer text (removing the raw URL if embedded in text)
-    let adminAnswer = (messageObj.text || "").replace(/(https?:\/\/[^\s]+)/g, '').trim();
-
-    return { sharedLink, adminAnswer, fallbackTitle };
-}
-
-// Helper: Attempt to fetch post content/question text via Facebook Graph API
-async function fetchPostContent(sharedLink, fallbackTitle) {
-    const PAGE_ACCESS_TOKEN = process.env.FB_PAGE_ACCESS_TOKEN;
-
-    // Try extracting numeric post ID from standard FB URLs (e.g., posts/123456789 or fbid=123456789)
-    const postIdMatch = sharedLink ? sharedLink.match(/(?:posts|permalink|story_fbid|v)=?\/?:?([0-9_]+)/) : null;
-    
-    if (postIdMatch && postIdMatch[1]) {
-        try {
-            const postId = postIdMatch[1];
-            const graphRes = await axios.get(`https://graph.facebook.com/v18.0/${postId}`, {
-                params: {
-                    fields: 'message,story',
-                    access_token: PAGE_ACCESS_TOKEN
-                }
-            });
-            if (graphRes.data && (graphRes.data.message || graphRes.data.story)) {
-                return graphRes.data.message || graphRes.data.story;
-            }
-        } catch (err) {
-            logger.warn("Could not fetch post details via Graph API, falling back to attachment metadata", err.message);
-        }
-    }
-
-    // Fallback to attachment title if Graph API lookup is restricted by group privacy
-    return fallbackTitle || "Question from shared post";
-}
-
-// --- Messenger Webhook Endpoint ---
-// List of Admin PSIDs authorized to submit new FAQ pairs
+// 5. Messenger Webhook endpoint (Two-step Admin FAQ ingestion + RAG query)
 const ADMIN_PSIDS = [
-    "29472827892312783", // Alexander Kartomin's PSID
+    "29472827892312783", // Alexander Kartomin's PSID[cite: 1]
 ];
 
 app.post('/messenger-webhook', async (req, res) => {
     const body = req.body;
     const PAGE_ACCESS_TOKEN = process.env.FB_PAGE_ACCESS_TOKEN;
 
-    logger.info("=== WEBHOOK REQUEST RECEIVED ===", { 
+    logger.info("=== WEBHOOK REQUEST RECEIVED ===", {
         object: body.object,
-        entryCount: body.entry?.length || 0 
+        entryCount: body.entry?.length || 0
     });
 
     try {
@@ -283,7 +255,10 @@ app.post('/messenger-webhook', async (req, res) => {
                 const messageObj = webhookEvent.message;
 
                 if (!messageObj || messageObj.is_echo || !senderPsid) {
-                    logger.info("Skipping event: Echo message, missing message object, or missing sender ID.", { senderPsid, isEcho: messageObj?.is_echo });
+                    logger.info("Skipping event: Echo message, missing message object, or missing sender ID.", {
+                        senderPsid,
+                        isEcho: messageObj?.is_echo
+                    });
                     continue;
                 }
 
@@ -292,22 +267,25 @@ app.post('/messenger-webhook', async (req, res) => {
                 const hasAttachments = Array.isArray(messageObj.attachments) && messageObj.attachments.length > 0;
                 const adminPendingRef = db.collection('admin_pending_faq').doc(senderPsid);
 
-                logger.info("Parsed Incoming Message", { 
-                    senderPsid, 
-                    isAdmin, 
-                    hasAttachments, 
+                logger.info("Parsed Incoming Message", {
+                    senderPsid,
+                    isAdmin,
+                    hasAttachments,
                     messageTextLength: messageText.length,
-                    rawText: messageText 
+                    rawText: messageText
                 });
 
                 if (isAdmin) {
                     const pendingDoc = await adminPendingRef.get();
-                    logger.info("Checked pending FAQ state for admin", { exists: pendingDoc.exists, data: pendingDoc.exists ? pendingDoc.data() : null });
+                    logger.info("Checked pending FAQ state for admin", {
+                        exists: pendingDoc.exists,
+                        data: pendingDoc.exists ? pendingDoc.data() : null
+                    });
 
                     // CASE A: Admin already shared an attachment without text, now sending the Answer
                     if (pendingDoc.exists && pendingDoc.data().stage === 'awaiting_answer' && messageText) {
                         logger.info("Admin matched CASE A: Received answer text for pending attachment.");
-                        
+
                         await adminPendingRef.set({
                             stage: 'awaiting_question',
                             answer: messageText,
@@ -318,26 +296,29 @@ app.post('/messenger-webhook', async (req, res) => {
                             recipient: { id: senderPsid },
                             message: { text: "💡 Answer recorded! Now reply with the question text to save it to the FAQ." }
                         });
-                        
+
                         logger.info("Successfully sent reply for CASE A.");
                         continue;
                     }
 
                     // CASE B: Step 2 — Answer is saved, admin is now sending the Question text
                     if (pendingDoc.exists && pendingDoc.data().stage === 'awaiting_question' && messageText) {
-                        logger.info("Admin matched CASE B: Received question text. Finalizing FAQ entry.");
-                        
+                        logger.info("Admin matched CASE B: Received question text. Generating embedding and saving FAQ.");
+
                         const answerText = pendingDoc.data().answer;
+                        const questionEmbedding = await getEmbedding(messageText);
 
                         const newFaqRef = await db.collection("faq_knowledge_base").add({
                             question: messageText,
                             answer: answerText,
+                            embedding: questionEmbedding,
+                            display_count: 0,
                             source: "Facebook Native Share",
                             createdBy: senderPsid,
                             timestamp: FieldValue.serverTimestamp()
                         });
 
-                        logger.info(`Successfully written FAQ to Firestore with ID: ${newFaqRef.id}`);
+                        logger.info(`Successfully written FAQ + embedding to Firestore with ID: ${newFaqRef.id}`);
 
                         await adminPendingRef.delete();
                         logger.info("Cleaned up pending FAQ document.");
@@ -382,11 +363,11 @@ app.post('/messenger-webhook', async (req, res) => {
                     }
                 }
 
-                // STANDARD QUERY FLOW (Regular users, or Admin asking a normal question without sharing)
+                // STANDARD QUERY FLOW (Uses shared RAG vector search + display_count increment)
                 if (messageText) {
-                    logger.info("Routing message to standard AI query handler.", { senderPsid, isAdmin });
+                    logger.info("Routing message to RAG search handler.", { senderPsid, isAdmin });
 
-                    const result = await generateAiAnswer(messageText, null);
+                    const result = await searchFaqWithRag(messageText, 'en');
                     let replyText = result.answer;
                     if (result.source) replyText += `\n\n🔗 ${result.source}`;
 
@@ -395,7 +376,7 @@ app.post('/messenger-webhook', async (req, res) => {
                         message: { text: replyText }
                     });
 
-                    logger.info("Successfully sent AI response to user.");
+                    logger.info("Successfully sent RAG/AI response to Messenger user.", { matchType: result.matchType });
                 }
             }
         }
