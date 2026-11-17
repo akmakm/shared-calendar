@@ -106,22 +106,79 @@ Return your response strictly as a JSON object with this format:
 // 1. WEB APP API ENDPOINT (faq.html)
 // ==========================================
 app.post('/', async (req, res) => {
-    const questionText = req.body.question || req.body.text || "";
-    const language = req.body.language || 'en';
-
-    // Log web request
-    logger.info("Web API request received", { question: questionText, language });
-
-    if (!questionText.trim()) {
-        return res.status(400).json({ error: "Question is required" });
+    const { question, language = 'en' } = req.body;
+    if (!question) {
+        logger.warn("Hybrid Search rejected: Missing question in request body.");
+        return res.status(400).json({ error: "Missing question" });
     }
 
-    const result = await generateAiAnswer(questionText, language);
-    
-    res.json({
-        answer: result.answer,
-        source: result.source
-    });
+    try {
+        logger.info("=== HYBRID SEARCH REQUEST RECEIVED ===", { question, language });
+
+        // 1. Fetch all documents from Firestore faq_knowledge_base
+        const snapshot = await db.collection("faq_knowledge_base").get();
+        logger.info(`Scanned ${snapshot.size} documents in faq_knowledge_base.`);
+
+        let bestMatch = null;
+        let highestScore = 0;
+        const CONFIDENCE_THRESHOLD = 0.6; // 60% keyword match requirement
+
+        snapshot.forEach(doc => {
+            const data = doc.data();
+            const score = calculateConfidence(question, data.question || "");
+            if (score > highestScore) {
+                highestScore = score;
+                bestMatch = { id: doc.id, ...data };
+            }
+        });
+
+        // 2. If confident match found in Firestore, increment display_count and return it directly
+        if (bestMatch && highestScore >= CONFIDENCE_THRESHOLD) {
+            logger.info("High-confidence match found in Firestore FAQ", {
+                matchId: bestMatch.id,
+                score: highestScore,
+                previousDisplayCount: bestMatch.display_count || 0
+            });
+
+            // Atomically increment display_count (initializes to 1 if missing)
+            await db.collection("faq_knowledge_base").doc(bestMatch.id).update({
+                display_count: FieldValue.increment(1),
+                last_displayed_at: FieldValue.serverTimestamp()
+            });
+
+            logger.info(`Incremented display_count for FAQ document [${bestMatch.id}]`);
+
+            return res.status(200).json({
+                answer: bestMatch.answer,
+                source: bestMatch.source || bestMatch.sourceUrl || null,
+                matchType: "database",
+                confidence: highestScore
+            });
+        }
+
+        // 3. Otherwise, fall back to AI search generator
+        logger.info("Low confidence or no match in Firestore. Falling back to AI search.", {
+            highestScore,
+            closestMatchId: bestMatch?.id || null
+        });
+
+        const aiResult = await generateAiAnswer(question, language);
+
+        logger.info("AI fallback completed successfully.", { hasSource: !!aiResult.source });
+
+        return res.status(200).json({
+            answer: aiResult.answer,
+            source: aiResult.source || null,
+            matchType: "ai_fallback"
+        });
+
+    } catch (error) {
+        logger.error("CRITICAL ERROR in hybrid search endpoint:", {
+            errorMessage: error.message,
+            errorStack: error.stack
+        });
+        return res.status(500).json({ answer: "Internal server error during search.", source: null });
+    }
 });
 
 // ==========================================
