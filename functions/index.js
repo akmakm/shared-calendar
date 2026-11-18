@@ -154,7 +154,7 @@ function cosineSimilarity(vecA, vecB) {
 
 // 3. Shared RAG search + display_count increment + AI fallback
 async function searchFaqWithRag(question, language = 'en') {
-    const SIMILARITY_THRESHOLD = 0.78;
+    const SIMILARITY_THRESHOLD = 0.82;
 
     logger.info("=== RAG VECTOR SEARCH STARTED ===", { question, language });
 
@@ -310,8 +310,8 @@ app.post('/messenger-webhook', async (req, res) => {
             }
         }
 
-        const SIMILARITY_THRESHOLD = 0.78;
-
+        const SIMILARITY_THRESHOLD = 0.82;
+        
         // If a similar answer already exists in KB, ask for FORCE confirmation
         if (mostSimilarMatch && highestSim >= SIMILARITY_THRESHOLD) {
             logger.info("Duplicate answer detected in KB", { matchId: mostSimilarMatch.id, similarity: highestSim });
