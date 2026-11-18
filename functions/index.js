@@ -153,19 +153,28 @@ function cosineSimilarity(vecA, vecB) {
 }
 
 // 3. Shared RAG search + display_count increment + AI fallback
-async function searchFaqWithRag(question, language = 'en') {
+async function searchFaqWithRag(question, language = null) {
     const SIMILARITY_THRESHOLD = 0.86;
     const queryToEmbed = question;
     // Translate non-English input to English for robust vector matching against KB
-    if (language && language !== 'en' && language !== 'auto') {
+    if (language !== 'en') {
         try {
             logger.info(`Translating query from [${language}] to English for vector RAG search.`);
+            const sourceHint = (language && language !== 'auto') ? `from [${language}] ` : '';
+            logger.info(`Translating query ${sourceHint}to English for vector RAG search.`);
             const translationResult = await ai.models.generateContent({
                 model: 'gemini-flash-lite-latest', // Or your standard text model
-                contents: `Translate the following petanque-related question from [${language}] to English. Return ONLY the translated text, with no extra quotes, formatting, or commentary:\n\n"${question}"`
+                contents: `Translate the following petanque-related question [${sourceHint}] to English. If already English, return as-is. Output ONLY the English text. \n\n"${question}"`
             });
-            logger.info(`translationResult = [${translationResult.text}]`);
-            const translated = translationResult.text ? translationResult.text.trim() : '';
+            // Safely extract text across @google/genai SDK response shapes
+            const rawText =
+                typeof translationResult.text === 'function'
+                    ? translationResult.text()
+                    : (translationResult.text ?? translationResult.candidates?.[0]?.content?.parts?.[0]?.text ?? '');
+
+            logger.info(`translationResult raw = [${rawText}]`);
+
+            const translated = rawText.trim().replace(/^["']|["']$/g, '');
             if (translated) {
                 queryToEmbed = translated;
                 logger.info(`Query successfully prepared in English: "${queryToEmbed}"`);
