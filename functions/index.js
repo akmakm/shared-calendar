@@ -107,19 +107,24 @@ Return your response strictly as a JSON object with this format:
 // ==========================================
 // 1. Generate embedding using the exact same model used to populate faq_knowledge_base
 async function getEmbedding(text) {
-    const apiKey = process.env.GEMINI_API_KEY;
-    // Note: Verify this matches the model that created your stored vectors (e.g., text-embedding-004 or gemini-embedding-001)
-    const model = "text-embedding-004";
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:embedContent?key=${apiKey}`;
-
-    const response = await axios.post(url, {
-        model: `models/${model}`,
-        content: {
-            parts: [{ text: text.trim() }]
+    const response = await ai.models.embedContent({
+        model: "models/gemini-embedding-001",
+        contents: text.trim(),
+        config: {
+            outputDimensionality: 768,
+            taskType: "RETRIEVAL_DOCUMENT"
         }
     });
 
-    return response.data.embedding.values;
+    const embeddingValues =
+        response.embedding?.values ||
+        response.embeddings?.[0]?.values;
+
+    if (!embeddingValues || !Array.isArray(embeddingValues)) {
+        throw new Error("Failed to extract embedding values from Gemini response.");
+    }
+
+    return embeddingValues;
 }
 
 // 2. Cosine similarity between two numeric arrays
