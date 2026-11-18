@@ -175,7 +175,7 @@ async function searchFaqWithRag(question, language = 'en') {
             });
         }
     }
-    logger.info("=== RAG VECTOR SEARCH STARTED ===", { question, language });
+    logger.info("=== RAG VECTOR SEARCH STARTED ===", { queryToEmbed, language });
 
     const queryEmbedding = await getEmbedding(queryToEmbed);
     logger.info("Generated query embedding", { dimensions: queryEmbedding.length });
