@@ -155,10 +155,29 @@ function cosineSimilarity(vecA, vecB) {
 // 3. Shared RAG search + display_count increment + AI fallback
 async function searchFaqWithRag(question, language = 'en') {
     const SIMILARITY_THRESHOLD = 0.86;
-
+    const queryToEmbed = question;
+    // Translate non-English input to English for robust vector matching against KB
+    if (language && language !== 'en' && language !== 'auto') {
+        try {
+            logger.info(`Translating query from [${language}] to English for vector RAG search.`);
+            const translationResult = await ai.models.generateContent({
+                model: 'gemini-2.5-flash', // Or your standard text model
+                contents: `Translate the following petanque-related question into English. Return ONLY the translated text, with no extra quotes, formatting, or commentary:\n\n"${question}"`
+            });
+            const translated = translationResult.text ? translationResult.text.trim() : '';
+            if (translated) {
+                queryToEmbed = translated;
+                logger.info(`Query successfully translated to English: "${queryToEmbed}"`);
+            }
+        } catch (transError) {
+            logger.warn("Query translation failed. Falling back to original question text.", {
+                errorMessage: transError.message
+            });
+        }
+    }
     logger.info("=== RAG VECTOR SEARCH STARTED ===", { question, language });
 
-    const queryEmbedding = await getEmbedding(question);
+    const queryEmbedding = await getEmbedding(queryToEmbed);
     logger.info("Generated query embedding", { dimensions: queryEmbedding.length });
 
     const snapshot = await db.collection("faq_knowledge_base").get();
