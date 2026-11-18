@@ -36,7 +36,8 @@ app.use(express.json());
 // --- Core AI Answer Generator (Shared by Web API & Messenger) ---
 async function generateAiAnswer(question, requestedLanguage = null) {
     try {
-        const ai = new GoogleGenAI({ apiKey: geminiApiKey.value() });
+        //const ai = new GoogleGenAI({ apiKey: geminiApiKey.value() });
+        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
         logger.info(`Processing query: "${question}" | Requested language: "${requestedLanguage || 'auto-detect'}"`);
 
