@@ -164,11 +164,11 @@ async function searchFaqWithRag(question, language = 'en') {
                 model: 'gemini-flash-lite-latest', // Or your standard text model
                 contents: `Translate the following petanque-related question from [${language}] to English. Return ONLY the translated text, with no extra quotes, formatting, or commentary:\n\n"${question}"`
             });
-            logger.info(`translationResult = [${translationResult.text}] `);
+            logger.info(`translationResult = [${translationResult.text}]`);
             const translated = translationResult.text ? translationResult.text.trim() : '';
             if (translated) {
                 queryToEmbed = translated;
-                logger.info(`Query successfully translated to English: "${queryToEmbed}"`);
+                logger.info(`Query successfully prepared in English: "${queryToEmbed}"`);
             }
         } catch (transError) {
             logger.warn("Query translation failed. Falling back to original question text.", {
