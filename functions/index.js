@@ -282,92 +282,144 @@ app.post('/messenger-webhook', async (req, res) => {
                 });
 
                 if (isAdmin) {
-                    const pendingDoc = await adminPendingRef.get();
-                    logger.info("Checked pending FAQ state for admin", {
-                        exists: pendingDoc.exists,
-                        data: pendingDoc.exists ? pendingDoc.data() : null
-                    });
+    const pendingDoc = await adminPendingRef.get();
+    const pendingData = pendingDoc.exists ? pendingDoc.data() : null;
 
-                    // CASE A: Admin already shared an attachment without text, now sending the Answer
-                    if (pendingDoc.exists && pendingDoc.data().stage === 'awaiting_answer' && messageText) {
-                        logger.info("Admin matched CASE A: Received answer text for pending attachment.");
+    logger.info("Checked pending FAQ state for admin", { exists: pendingDoc.exists, data: pendingData });
 
-                        await adminPendingRef.set({
-                            stage: 'awaiting_question',
-                            answer: messageText,
-                            timestamp: FieldValue.serverTimestamp()
-                        });
+    // STATE 0: No pending state exists. This incoming message is a NEW proposed Answer!
+    if (!pendingDoc.exists && messageText) {
+        logger.info("Admin provided a new proposed answer. Checking KB for duplicates...");
 
-                        await axios.post(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
-                            recipient: { id: senderPsid },
-                            message: { text: "💡 Answer recorded! Now reply with the question text to save it to the FAQ." }
-                        });
+        // Generate embedding for the proposed answer
+        const proposedEmbedding = await getEmbedding(messageText);
 
-                        logger.info("Successfully sent reply for CASE A.");
-                        continue;
-                    }
+        // Check KB similarity against existing answer embeddings
+        const snapshot = await db.collection("faq_knowledge_base").get();
+        let mostSimilarMatch = null;
+        let highestSim = -1;
 
-                    // CASE B: Step 2 — Answer is saved, admin is now sending the Question text
-                    if (pendingDoc.exists && pendingDoc.data().stage === 'awaiting_question' && messageText) {
-                        logger.info("Admin matched CASE B: Received question text. Generating embedding and saving FAQ.");
-
-                        const answerText = pendingDoc.data().answer;
-                        const questionEmbedding = await getEmbedding(messageText);
-
-                        const newFaqRef = await db.collection("faq_knowledge_base").add({
-                            question: messageText,
-                            answer: answerText,
-                            embedding: questionEmbedding,
-                            display_count: 0,
-                            source: "Facebook Native Share",
-                            createdBy: senderPsid,
-                            timestamp: FieldValue.serverTimestamp()
-                        });
-
-                        logger.info(`Successfully written FAQ + embedding to Firestore with ID: ${newFaqRef.id}`);
-
-                        await adminPendingRef.delete();
-                        logger.info("Cleaned up pending FAQ document.");
-
-                        await axios.post(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
-                            recipient: { id: senderPsid },
-                            message: { text: `✅ FAQ Saved!\n\n📌 Q: ${messageText}\n💡 A: ${answerText}\n🆔 ID: ${newFaqRef.id}` }
-                        });
-
-                        logger.info("Successfully sent confirmation for CASE B.");
-                        continue;
-                    }
-
-                    // CASE C: Step 1 — Admin shared a post with attachment + answer in the same event
-                    if (hasAttachments && messageText) {
-                        logger.info("Admin matched CASE C: Received attachment + answer text simultaneously.");
-
-                        await adminPendingRef.set({
-                            stage: 'awaiting_question',
-                            answer: messageText,
-                            timestamp: FieldValue.serverTimestamp()
-                        });
-
-                        await axios.post(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
-                            recipient: { id: senderPsid },
-                            message: { text: "💡 Answer recorded! Now reply with the question text to save it to the FAQ." }
-                        });
-
-                        logger.info("Successfully sent prompt for CASE C.");
-                        continue;
-                    }
-
-                    // CASE D: Step 1 (Split event) — Admin shared a post, attachment arrived first without text
-                    if (hasAttachments && !messageText) {
-                        logger.info("Admin matched CASE D: Received attachment without text. Setting awaiting_answer stage.");
-
-                        await adminPendingRef.set({
-                            stage: 'awaiting_answer',
-                            timestamp: FieldValue.serverTimestamp()
-                        });
-                        continue;
-                    }
+        for (const doc of snapshot.docs) {
+            const data = doc.data();
+            if (Array.isArray(data.embedding) && data.embedding.length > 0) {
+                const sim = cosineSimilarity(proposedEmbedding, data.embedding);
+                if (sim > highestSim) {
+                    highestSim = sim;
+                    mostSimilarMatch = { id: doc.id, ...data };
                 }
+            }
+        }
+
+        const SIMILARITY_THRESHOLD = 0.78;
+
+        // If a similar answer already exists in KB, ask for FORCE confirmation
+        if (mostSimilarMatch && highestSim >= SIMILARITY_THRESHOLD) {
+            logger.info("Duplicate answer detected in KB", { matchId: mostSimilarMatch.id, similarity: highestSim });
+
+            await adminPendingRef.set({
+                stage: 'awaiting_force_confirmation',
+                answer: messageText,
+                embedding: proposedEmbedding,
+                timestamp: FieldValue.serverTimestamp()
+            });
+
+            await axios.post(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
+                recipient: { id: senderPsid },
+                message: { text: `⚠️ **Similar Answer Exists in KB** (Similarity: ${(highestSim * 100).toFixed(1)}%)\n\nMatched Q: "${mostSimilarMatch.question}"\n\nReply **FORCE** to record it anyway, or send a different answer to start over.` }
+            });
+            continue;
+        }
+
+        // If absent, proceed to prompt for source link
+        logger.info("Answer is unique. Proceeding to source link prompt.");
+        await adminPendingRef.set({
+            stage: 'awaiting_source_link',
+            answer: messageText,
+            embedding: proposedEmbedding,
+            timestamp: FieldValue.serverTimestamp()
+        });
+
+        await axios.post(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
+            recipient: { id: senderPsid },
+            message: { text: "💡 Answer unique & recorded! Now reply with the **source link** (or type 'none' to skip)." }
+        });
+        continue;
+    }
+
+    // STATE 1: Awaiting Force Confirmation
+    if (pendingData && pendingData.stage === 'awaiting_force_confirmation' && messageText) {
+        if (messageText.toUpperCase() === 'FORCE') {
+            logger.info("Admin forced recording of duplicate answer. Moving to source link stage.");
+
+            await adminPendingRef.update({
+                stage: 'awaiting_source_link',
+                timestamp: FieldValue.serverTimestamp()
+            });
+
+            await axios.post(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
+                recipient: { id: senderPsid },
+                message: { text: "⚡ Force accepted! Now reply with the **source link** (or type 'none' to skip)." }
+            });
+        } else {
+            logger.info("Admin declined force confirmation. Skipping record.");
+            await adminPendingRef.delete();
+
+            await axios.post(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
+                recipient: { id: senderPsid },
+                message: { text: "❌ Skipped recording. Send a new answer whenever you're ready." }
+            });
+        }
+        continue;
+    }
+
+    // STATE 2: Awaiting Source Link
+    if (pendingData && pendingData.stage === 'awaiting_source_link' && messageText) {
+        logger.info("Admin provided source link.");
+
+        const sourceLink = messageText.toLowerCase() === 'none' ? null : messageText;
+
+        await adminPendingRef.update({
+            stage: 'awaiting_question',
+            sourceUrl: sourceLink,
+            timestamp: FieldValue.serverTimestamp()
+        });
+
+        await axios.post(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
+            recipient: { id: senderPsid },
+            message: { text: "📌 Source link recorded! Finally, reply with the **question text** to save it to the FAQ." }
+        });
+        continue;
+    }
+
+    // STATE 3: Awaiting Question Text (Final Save)
+    if (pendingData && pendingData.stage === 'awaiting_question' && messageText) {
+        logger.info("Admin provided question text. Saving FAQ to Firestore.");
+
+        const answerText = pendingData.answer;
+        const answerEmbedding = pendingData.embedding;
+        const sourceLink = pendingData.sourceUrl || null;
+
+        const newFaqRef = await db.collection("faq_knowledge_base").add({
+            question: messageText,
+            answer: answerText,
+            embedding: answerEmbedding,
+            source: sourceLink || "Facebook Admin Share",
+            display_count: 0,
+            createdBy: senderPsid,
+            timestamp: FieldValue.serverTimestamp()
+        });
+
+        logger.info(`Successfully written FAQ to Firestore with ID: ${newFaqRef.id}`);
+
+        await adminPendingRef.delete();
+
+        await axios.post(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
+            recipient: { id: senderPsid },
+            message: { text: `✅ FAQ Saved Successfully!\n\n📌 Q: ${messageText}\n💡 A: ${answerText}\n🔗 Source: ${sourceLink || 'None'}\n🆔 ID: ${newFaqRef.id}` }
+        });
+        continue;
+    }
+}
 
                 // STANDARD QUERY FLOW (Uses shared RAG vector search + display_count increment)
                 if (messageText) {
