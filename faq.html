@@ -110,6 +110,20 @@ function setBotMessageContent(msgDiv, content, sourceUrl) {
     }
 }
 
+// Helper to get active language from Google Translate or HTML tag
+function getCurrentLanguage() {
+    // Check Google Translate cookie if present (format: /en/bg or /auto/bg)
+    const match = document.cookie.match(/(?:^|;\s*)googtrans=([^;]*)/);
+    if (match) {
+        const parts = match[1].split('/');
+        if (parts.length >= 3 && parts[2]) {
+            return parts[2]; // e.g. 'bg', 'fr', 'sr'
+        }
+    }
+    // Fallback to html lang attribute or default to 'en'
+    return document.documentElement.lang || 'en';
+}
+
 async function submitQuestion(questionText) {
     if (!questionText.trim()) return;
 
@@ -124,8 +138,9 @@ async function submitQuestion(questionText) {
     chatMessages.appendChild(loadingDiv);
     chatMessages.scrollTop = chatMessages.scrollHeight;
 
+    const activeLanguage = getCurrentLanguage();
+
     try {
-        console.warn(`alka1: POST (CLOUD_FUNCTION_URL) body: language===en, question=${questionText}`);
         const response = await fetch(CLOUD_FUNCTION_URL, {
             method: 'POST',
             headers: {
@@ -135,16 +150,13 @@ async function submitQuestion(questionText) {
             // TODO: remove language auto-detection from AI prompt to FB web-hook
             body: JSON.stringify({
                 question: questionText,
-                language: 'en'
+                language: activeLanguage // Pass active UI language dynamically!
             })
         });
-        console.warn(`alka2: response=${response.status}`);
-        if (!response.ok) {
-            throw new Error(`Server returned status: ${response.status}`);
-        }
+
+        if (!response.ok) throw new Error(`Server returned status: ${response.status}`);
 
         const data = await response.json();
-        console.warn(`alka3: data.answer=${data.answer}`);
         // Render Cloud Run answer and optional source link (expecting data.answer and data.source)
         setBotMessageContent(
             loadingDiv, 
