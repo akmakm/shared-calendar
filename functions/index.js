@@ -162,8 +162,9 @@ async function searchFaqWithRag(question, language = 'en') {
             logger.info(`Translating query from [${language}] to English for vector RAG search.`);
             const translationResult = await ai.models.generateContent({
                 model: 'gemini-flash-lite-latest', // Or your standard text model
-                contents: `Translate the following petanque-related question into English. Return ONLY the translated text, with no extra quotes, formatting, or commentary:\n\n"${question}"`
+                contents: `Translate the following petanque-related question from [${language}] to English. Return ONLY the translated text, with no extra quotes, formatting, or commentary:\n\n"${question}"`
             });
+            logger.info(`translationResult = [${translationResult.text}] `);
             const translated = translationResult.text ? translationResult.text.trim() : '';
             if (translated) {
                 queryToEmbed = translated;
