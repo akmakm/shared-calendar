@@ -107,6 +107,7 @@ Return your response strictly as a JSON object with this format:
 // ==========================================
 // 1. Generate embedding using the exact same model used to populate faq_knowledge_base
 async function getEmbedding(text) {
+    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     const response = await ai.models.embedContent({
         model: "models/gemini-embedding-001",
         contents: text.trim(),
