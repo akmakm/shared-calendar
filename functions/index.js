@@ -20,6 +20,8 @@ const fbPageAccessToken = defineSecret("FB_PAGE_ACCESS_TOKEN");
 const fbVerifyToken = defineSecret("FB_VERIFY_TOKEN");
 
 const app = express();
+        //const ai = new GoogleGenAI({ apiKey: geminiApiKey.value() });
+        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
 // Enable CORS for your domain and local development
 app.use(cors({
@@ -36,8 +38,6 @@ app.use(express.json());
 // --- Core AI Answer Generator (Shared by Web API & Messenger) ---
 async function generateAiAnswer(question, requestedLanguage = null) {
     try {
-        //const ai = new GoogleGenAI({ apiKey: geminiApiKey.value() });
-        const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 
         logger.info(`Processing query: "${question}" | Requested language: "${requestedLanguage || 'auto-detect'}"`);
 
@@ -108,7 +108,7 @@ Return your response strictly as a JSON object with this format:
 // ==========================================
 // 1. Generate embedding using the exact same model used to populate faq_knowledge_base
 async function getEmbedding(text) {
-    const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+    //const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
     const response = await ai.models.embedContent({
         model: "models/gemini-embedding-001",
         contents: text.trim(),
