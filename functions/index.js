@@ -156,7 +156,7 @@ function cosineSimilarity(vecA, vecB) {
 // 3. Shared RAG search + display_count increment + AI fallback
 async function searchFaqWithRag(question, language = null) {
     const SIMILARITY_THRESHOLD = 0.86;
-    queryToEmbed = question;
+    let queryToEmbed = question;
     // Translate non-English input to English for robust vector matching against KB
     if (language !== 'en') {
         try {
