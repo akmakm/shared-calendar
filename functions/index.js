@@ -176,6 +176,8 @@ async function searchFaqWithRag(question, language = null) {
             logger.info(`translationResult raw = [${rawText}]`);
 
             const translated = rawText.trim().replace(/^["']|["']$/g, '');
+            logger.info(`translated = rawText.trim() = [${translated}]`);
+
             if (translated) {
                 queryToEmbed = translated;
                 logger.info(`Query successfully prepared in English: "${queryToEmbed}"`);
