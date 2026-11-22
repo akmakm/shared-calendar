@@ -155,7 +155,7 @@ function cosineSimilarity(vecA, vecB) {
 
 // 3. Shared RAG search + display_count increment + AI fallback
 async function searchFaqWithRag(question, language = null) {
-    const SIMILARITY_THRESHOLD = 0.86;
+    const SIMILARITY_THRESHOLD = 0.88;
     let queryToEmbed = question;
     // Translate non-English input to English for robust vector matching against KB
     if (language !== 'en') {
@@ -316,19 +316,26 @@ app.post('/messenger-webhook', async (req, res) => {
                 if (isAdmin) {
     const pendingDoc = await adminPendingRef.get();
     const pendingData = pendingDoc.exists ? pendingDoc.data() : null;
+    const SIMILARITY_THRESHOLD = 0.88;
 
-    logger.info("Checked pending FAQ state for admin", { exists: pendingDoc.exists, data: pendingData });
+    logger.info("Checked pending FAQ state for admin", { exists: pendingDoc.exists, stage: pendingData?.stage });
 
-    // STATE 0: No pending state exists. This incoming message is a NEW proposed Answer!
+    // Helper to send Messenger replies cleanly
+    const replyToAdmin = async (text) => {
+        await axios.post(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
+            recipient: { id: senderPsid },
+            message: { text }
+        });
+    };
+
+    // STAGE 0: No pending state -> Admin sent a new proposed Answer
     if (!pendingDoc.exists && messageText) {
-        logger.info("Admin provided a new proposed answer. Checking KB for duplicates...");
+        logger.info("Admin provided a new proposed answer. Scanning KB for top match...");
 
-        // Generate embedding for the proposed answer
         const proposedEmbedding = await getEmbedding(messageText);
-
-        // Check KB similarity against existing answer embeddings
         const snapshot = await db.collection("faq_knowledge_base").get();
-        let mostSimilarMatch = null;
+
+        let topMatch = null;
         let highestSim = -1;
 
         for (const doc of snapshot.docs) {
@@ -337,78 +344,100 @@ app.post('/messenger-webhook', async (req, res) => {
                 const sim = cosineSimilarity(proposedEmbedding, data.embedding);
                 if (sim > highestSim) {
                     highestSim = sim;
-                    mostSimilarMatch = { id: doc.id, ...data };
+                    topMatch = { id: doc.id, ...data };
                 }
             }
         }
 
-        const SIMILARITY_THRESHOLD = 0.86;
-        
-        // If a similar answer already exists in KB, ask for FORCE confirmation
-        if (mostSimilarMatch && highestSim >= SIMILARITY_THRESHOLD) {
-            logger.info("Duplicate answer detected in KB", { matchId: mostSimilarMatch.id, similarity: highestSim });
+        const confidencePct = topMatch ? (highestSim * 100).toFixed(1) : "0.0";
+        const thresholdPct = (SIMILARITY_THRESHOLD * 100).toFixed(1);
+        const isAssumedMatch = topMatch && highestSim >= SIMILARITY_THRESHOLD;
 
-            await adminPendingRef.set({
-                stage: 'awaiting_force_confirmation',
-                answer: messageText,
-                embedding: proposedEmbedding,
-                timestamp: FieldValue.serverTimestamp()
-            });
-
-            await axios.post(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
-                recipient: { id: senderPsid },
-                message: { text: `⚠️ **Similar Answer Exists in KB** (Similarity: ${(highestSim * 100).toFixed(1)}%)\n\nMatched Q: "${mostSimilarMatch.question}"\n\nReply **FORCE** to record it anyway, or send a different answer to start over.` }
-            });
-            continue;
-        }
-
-        // If absent, proceed to prompt for source link
-        logger.info("Answer is unique. Proceeding to source link prompt.");
         await adminPendingRef.set({
-            stage: 'awaiting_source_link',
+            stage: 'awaiting_decision',
             answer: messageText,
             embedding: proposedEmbedding,
+            matchedDocId: topMatch ? topMatch.id : null,
             timestamp: FieldValue.serverTimestamp()
         });
 
-        await axios.post(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
-            recipient: { id: senderPsid },
-            message: { text: "💡 Answer unique & recorded! Now reply with the **source link** (or type 'none' to skip)." }
-        });
+        let summaryMsg;
+        if (topMatch) {
+            const statusLabel = isAssumedMatch ? "⚠️ ASSUMED MATCH" : "ℹ️ NO CONFIDENT MATCH";
+            summaryMsg =
+                `${statusLabel}\n` +
+                `📊 Confidence: ${confidencePct}% (Threshold: ${thresholdPct}%)\n\n` +
+                `📌 Top Existing Q: "${topMatch.question}"\n` +
+                `💡 Top Existing A: "${topMatch.answer}"\n` +
+                `🆔 Doc ID: ${topMatch.id}\n\n` +
+                `Choose an action:\n` +
+                `• Reply **KEEP** to keep existing & cancel\n` +
+                `• Reply **ADD** to save as a new record\n` +
+                `• Reply **REPLACE** to overwrite this existing record`;
+        } else {
+            summaryMsg =
+                `ℹ️ KB IS EMPTY (Confidence: 0.0% vs Threshold: ${thresholdPct}%)\n\n` +
+                `Reply **ADD** to save as a new record, or **KEEP** to cancel.`;
+        }
+
+        await replyToAdmin(summaryMsg);
         continue;
     }
 
-    // STATE 1: Awaiting Force Confirmation
-    if (pendingData && pendingData.stage === 'awaiting_force_confirmation' && messageText) {
-        if (messageText.toUpperCase() === 'FORCE') {
-            logger.info("Admin forced recording of duplicate answer. Moving to source link stage.");
+    // STAGE 1: Awaiting Decision (KEEP / ADD / REPLACE)
+    if (pendingData && pendingData.stage === 'awaiting_decision' && messageText) {
+        const choice = messageText.trim().toUpperCase();
+
+        if (choice === 'KEEP') {
+            logger.info("Admin chose KEEP. Aborting new entry.");
+            await adminPendingRef.delete();
+            await replyToAdmin("✅ Kept existing record. Recording cancelled.");
+            continue;
+        }
+
+        if (choice === 'ADD' || (choice === 'REPLACE' && pendingData.matchedDocId)) {
+            const actionMode = choice.toLowerCase(); // 'add' or 'replace'
+            logger.info(`Admin chose ${choice}. Moving to source link stage.`);
 
             await adminPendingRef.update({
                 stage: 'awaiting_source_link',
+                actionMode,
                 timestamp: FieldValue.serverTimestamp()
             });
 
-            await axios.post(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
-                recipient: { id: senderPsid },
-                message: { text: "⚡ Force accepted! Now reply with the **source link** (or type 'none' to skip)." }
-            });
-        } else {
-            logger.info("Admin declined force confirmation. Skipping record.");
-            await adminPendingRef.delete();
-
-            await axios.post(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
-                recipient: { id: senderPsid },
-                message: { text: "❌ Skipped recording. Send a new answer whenever you're ready." }
-            });
+            await replyToAdmin(
+                `👍 Mode: **${choice}**.\n\n` +
+                `Now reply with:\n` +
+                `• A **source URL**\n` +
+                `• **none** to save without a source link\n` +
+                `• **stop** to cancel recording`
+            );
+            continue;
         }
+
+        // Invalid command or REPLACE when KB was empty
+        await replyToAdmin(
+            pendingData.matchedDocId
+                ? "❓ Please reply with **KEEP**, **ADD**, or **REPLACE**."
+                : "❓ No existing record to replace. Please reply with **ADD** or **KEEP**."
+        );
         continue;
     }
 
-    // STATE 2: Awaiting Source Link
+    // STAGE 2: Awaiting Source Link (URL / 'none' / 'stop')
     if (pendingData && pendingData.stage === 'awaiting_source_link' && messageText) {
-        logger.info("Admin provided source link.");
+        const trimmedInput = messageText.trim();
+        const lowerInput = trimmedInput.toLowerCase();
 
-        const sourceLink = messageText.toLowerCase() === 'none' ? null : messageText;
+        if (lowerInput === 'stop') {
+            logger.info("Admin chose STOP during source link stage. Aborting.");
+            await adminPendingRef.delete();
+            await replyToAdmin("🛑 Recording stopped. No changes were saved.");
+            continue;
+        }
+
+        const sourceLink = lowerInput === 'none' ? null : trimmedInput;
+        logger.info("Admin provided source link choice.", { sourceLink });
 
         await adminPendingRef.update({
             stage: 'awaiting_question',
@@ -416,39 +445,58 @@ app.post('/messenger-webhook', async (req, res) => {
             timestamp: FieldValue.serverTimestamp()
         });
 
-        await axios.post(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
-            recipient: { id: senderPsid },
-            message: { text: "📌 Source link recorded! Finally, reply with the **question text** to save it to the FAQ." }
-        });
+        await replyToAdmin(
+            `📌 Source: ${sourceLink || 'None'}.\n\n` +
+            `Finally, reply with the **question text** to finalize and save (or **stop** to cancel).`
+        );
         continue;
     }
 
-    // STATE 3: Awaiting Question Text (Final Save)
+    // STAGE 3: Awaiting Question Text -> Commit ADD or REPLACE to Firestore
     if (pendingData && pendingData.stage === 'awaiting_question' && messageText) {
-        logger.info("Admin provided question text. Saving FAQ to Firestore.");
+        const trimmedQuestion = messageText.trim();
 
-        const answerText = pendingData.answer;
-        const answerEmbedding = pendingData.embedding;
-        const sourceLink = pendingData.sourceUrl || null;
+        if (trimmedQuestion.toLowerCase() === 'stop') {
+            logger.info("Admin chose STOP during question stage. Aborting.");
+            await adminPendingRef.delete();
+            await replyToAdmin("🛑 Recording stopped. No changes were saved.");
+            continue;
+        }
 
-        const newFaqRef = await db.collection("faq_knowledge_base").add({
-            question: messageText,
-            answer: answerText,
-            embedding: answerEmbedding,
-            source: sourceLink || "Facebook Admin Share",
-            display_count: 0,
-            createdBy: senderPsid,
+        const payload = {
+            question: trimmedQuestion,
+            answer: pendingData.answer,
+            embedding: pendingData.embedding,
+            source: pendingData.sourceUrl || null,
+            updatedBy: senderPsid,
             timestamp: FieldValue.serverTimestamp()
-        });
+        };
 
-        logger.info(`Successfully written FAQ to Firestore with ID: ${newFaqRef.id}`);
+        let savedDocId;
+
+        if (pendingData.actionMode === 'replace' && pendingData.matchedDocId) {
+            savedDocId = pendingData.matchedDocId;
+            await db.collection("faq_knowledge_base").doc(savedDocId).update(payload);
+            logger.info(`Replaced existing FAQ document: ${savedDocId}`);
+        } else {
+            const newFaqRef = await db.collection("faq_knowledge_base").add({
+                ...payload,
+                display_count: 0,
+                createdBy: senderPsid
+            });
+            savedDocId = newFaqRef.id;
+            logger.info(`Added new FAQ document: ${savedDocId}`);
+        }
 
         await adminPendingRef.delete();
 
-        await axios.post(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
-            recipient: { id: senderPsid },
-            message: { text: `✅ FAQ Saved Successfully!\n\n📌 Q: ${messageText}\n💡 A: ${answerText}\n🔗 Source: ${sourceLink || 'None'}\n🆔 ID: ${newFaqRef.id}` }
-        });
+        await replyToAdmin(
+            `✅ FAQ ${pendingData.actionMode === 'replace' ? 'Replaced' : 'Added'} Successfully!\n\n` +
+            `📌 Q: ${trimmedQuestion}\n` +
+            `💡 A: ${pendingData.answer}\n` +
+            `🔗 Source: ${pendingData.sourceUrl || 'None'}\n` +
+            `🆔 ID: ${savedDocId}`
+        );
         continue;
     }
 }
