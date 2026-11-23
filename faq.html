@@ -135,7 +135,7 @@ function setBotMessageContent(element, data, originalQuestion) {
         rightCol.className = 'rag-side-panel';
 
         const matchText = document.createElement('div');
-        matchText.textContent = `Best match in my knowledge base: ${data.confidence}`;
+        matchText.innerHTML = `Best match in my<br>knowledge base: ${data.confidence}`;
 
         const group = `fb_${data.docId}_${Date.now()}`;
         let done = false;
@@ -149,7 +149,7 @@ function setBotMessageContent(element, data, originalQuestion) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ docId: data.docId })
             });
-            matchText.textContent = `Best match in my knowledge base: ${data.confidence} ✓`;
+            matchText.innerHTML = `Best match in my<br>knowledge base: ${data.confidence} ✓`;
         });
 
         const gemini = makeThumbRadio(group, 'gemini', '👎', 'Ask Gemini', () => {
