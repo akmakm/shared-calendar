@@ -166,6 +166,7 @@ function setBotMessageContent(element, data, originalQuestion) {
         return;
     }
 
+    // Direct Gemini fallback answer (either < 76% match or user clicked "Ask Gemini")
     element.appendChild(answerDiv);
     if (data.source) {
         const link = document.createElement('a');
@@ -173,24 +174,8 @@ function setBotMessageContent(element, data, originalQuestion) {
         link.target = '_blank';
         link.rel = 'noopener noreferrer';
         link.textContent = '🔗 Source';
-        link.style.display = 'block';
-        link.style.marginTop = '4px';
-        element.appendChild(link);
-    }
-}
-    // Direct Gemini fallback answer (either < 76% match or user clicked "Ask Gemini")
-    const answerDiv = document.createElement('div');
-    answerDiv.textContent = data.answer || "Sorry, I couldn't find an answer.";
-    element.appendChild(answerDiv);
-
-    if (data.source) {
-        const link = document.createElement('a');
-        link.href = data.source;
-        link.target = '_blank';
-        link.rel = 'noopener noreferrer';
         link.style.display = 'block';
         link.style.marginTop = '6px';
-        link.textContent = '🔗 Source';
         element.appendChild(link);
     }
 }
