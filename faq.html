@@ -84,29 +84,33 @@ function appendMessage(text, sender) {
 }
 
 // Helper to format bot responses with optional clickable source links safely
-function setBotMessageContent(msgDiv, content, sourceUrl) {
-    msgDiv.innerHTML = ''; // Clear "Thinking..."
+function setBotMessageContent(element, answer, source, confidence, matchType) {
+    element.innerHTML = ''; // Clear "Thinking..."
 
-    const textSpan = document.createElement('span');
-    textSpan.textContent = content;
-    msgDiv.appendChild(textSpan);
+    const answerP = document.createElement('div');
+    answerP.textContent = answer;
+    element.appendChild(answerP);
 
-    if (sourceUrl && sourceUrl.trim() !== '') {
-        const br = document.createElement('br');
-        msgDiv.appendChild(br);
+    if (confidence) {
+        const metaDiv = document.createElement('div');
+        metaDiv.style.fontSize = '0.8em';
+        metaDiv.style.opacity = '0.75';
+        metaDiv.style.marginTop = '6px';
+        metaDiv.textContent = matchType === 'rag_database'
+            ? `📊 Confidence: ${confidence}`
+            : `🤖 AI Fallback (Top KB similarity: ${confidence})`;
+        element.appendChild(metaDiv);
+    }
 
-        const sourceLink = document.createElement('a');
-        sourceLink.href = sourceUrl;
-        sourceLink.textContent = '🔗 Source Reference';
-        sourceLink.target = '_blank';
-        sourceLink.rel = 'noopener noreferrer';
-        sourceLink.style.display = 'inline-block';
-        sourceLink.style.marginTop = '6px';
-        sourceLink.style.fontSize = '0.85em';
-        sourceLink.style.color = 'inherit';
-        sourceLink.style.textDecoration = 'underline';
-        
-        msgDiv.appendChild(sourceLink);
+    if (source) {
+        const link = document.createElement('a');
+        link.href = source;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.style.display = 'block';
+        link.style.marginTop = '4px';
+        link.textContent = '🔗 Source';
+        element.appendChild(link);
     }
 }
 
@@ -159,9 +163,11 @@ async function submitQuestion(questionText) {
         const data = await response.json();
         // Render Cloud Run answer and optional source link (expecting data.answer and data.source)
         setBotMessageContent(
-            loadingDiv, 
-            data.answer || "Sorry, I couldn't find an answer.", 
-            data.source || data.sourceUrl
+            loadingDiv,
+            data.answer || "Sorry, I couldn't find an answer.",
+            data.source,
+            data.confidence,
+            data.matchType
         );
 
     } catch (error) {
