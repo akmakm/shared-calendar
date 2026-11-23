@@ -154,118 +154,124 @@ function cosineSimilarity(vecA, vecB) {
 }
 
 // 3. Shared RAG search + display_count increment + AI fallback
-async function searchFaqWithRag(question, language = null) {
-    const SIMILARITY_THRESHOLD = 0.88;
+async function searchFaqWithRag(question, language = null, forceAi = false) {
+    const SIMILARITY_THRESHOLD = 0.76;
+
+    // Bypass KB lookup if user explicitly clicked "Ask Gemini"
+    if (forceAi) {
+        logger.info("Bypassing KB search (user requested Ask Gemini).", { question, language });
+        const aiResult = await generateAiAnswer(question, language);
+        return {
+            answer: aiResult.answer,
+            source: aiResult.source || null,
+            matchType: "ai_fallback",
+            docId: null,
+            similarity: null,
+            confidence: null
+        };
+    }
+
     let queryToEmbed = question;
-    // Translate non-English input to English for robust vector matching against KB
+
     if (language !== 'en') {
         try {
-            logger.info(`Translating query from [${language}] to English for vector RAG search.`);
             const sourceHint = (language && language !== 'auto') ? `from [${language}] ` : '';
-            logger.info(`Translating query ${sourceHint}to English for vector RAG search.`);
             const translationResult = await ai.models.generateContent({
-                model: 'gemini-flash-lite-latest', // Or your standard text model
-                contents: `Translate the following petanque-related question [${sourceHint}] to English. If already English, return as-is. Output ONLY the English text. \n\n"${question}"`
+                model: 'gemini-flash-lite-latest',
+                contents: `Translate the following petanque-related question ${sourceHint}to English. If already English, return as-is. Output ONLY the English text:\n\n"${question}"`
             });
-            // Safely extract text across @google/genai SDK response shapes
-            const rawText =
-                typeof translationResult.text === 'function'
-                    ? translationResult.text()
-                    : (translationResult.text ?? translationResult.candidates?.[0]?.content?.parts?.[0]?.text ?? '');
-
-            logger.info(`translationResult raw = [${rawText}]`);
-
+            const rawText = typeof translationResult.text === 'function'
+                ? translationResult.text()
+                : (translationResult.text ?? translationResult.candidates?.[0]?.content?.parts?.[0]?.text ?? '');
             const translated = rawText.trim().replace(/^["']|["']$/g, '');
-            logger.info(`translated = rawText.trim() = [${translated}]`);
-
             if (typeof translated === 'string' && translated.length > 0) {
                 queryToEmbed = translated;
-                logger.info(`Query successfully prepared in English: "${queryToEmbed}"`);
             }
         } catch (transError) {
-            logger.warn("Query translation failed. Falling back to original question text.", {
-                errorMessage: transError.message
-            });
+            logger.warn("Query translation failed.", { errorMessage: transError.message });
         }
     }
-    logger.info("=== RAG VECTOR SEARCH STARTED ===", { queryToEmbed, language });
 
     const queryEmbedding = await getEmbedding(queryToEmbed);
-    logger.info("Generated query embedding", { dimensions: queryEmbedding.length });
-
     const snapshot = await db.collection("faq_knowledge_base").get();
-    logger.info(`Loaded ${snapshot.size} documents from faq_knowledge_base.`);
 
     let bestMatch = null;
     let highestSimilarity = -1;
 
     for (const doc of snapshot.docs) {
         const data = doc.data();
-        if (!Array.isArray(data.embedding) || data.embedding.length === 0) {
-            logger.warn(`Skipping FAQ doc [${doc.id}]: missing or empty embedding array.`);
-            continue;
-        }
+        if (!Array.isArray(data.embedding) || data.embedding.length === 0) continue;
 
         const similarity = cosineSimilarity(queryEmbedding, data.embedding);
         if (similarity > highestSimilarity) {
             highestSimilarity = similarity;
-            bestMatch = { id: doc.id, ref: doc.ref, ...data };
+            bestMatch = { id: doc.id, ...data };
         }
     }
 
-    logger.info("RAG vector scan finished", {
-        bestMatchId: bestMatch?.id || null,
-        bestMatchQuestion: bestMatch?.question || null,
-        highestSimilarity: Number(highestSimilarity.toFixed(4)),
-        threshold: SIMILARITY_THRESHOLD
-    });
+    const confidencePct = highestSimilarity > 0
+        ? `${(highestSimilarity * 100).toFixed(1)}%`
+        : "0.0%";
 
+    // Match >= 76%: return KB answer WITHOUT incrementing display_count yet
     if (bestMatch && highestSimilarity >= SIMILARITY_THRESHOLD) {
-        await bestMatch.ref.update({
-            display_count: FieldValue.increment(1),
-            last_displayed_at: FieldValue.serverTimestamp()
-        });
-
-        logger.info(`Confident RAG match [${bestMatch.id}]. Incremented display_count.`, {
-            previousCount: bestMatch.display_count || 0
-        });
-
+        logger.info(`KB match [${bestMatch.id}] at ${confidencePct}. Awaiting user feedback.`);
         return {
             answer: bestMatch.answer,
             source: bestMatch.source || bestMatch.sourceUrl || null,
             matchType: "rag_database",
-            similarity: highestSimilarity
+            docId: bestMatch.id,
+            similarity: highestSimilarity,
+            confidence: confidencePct
         };
     }
 
-    logger.info("No confident vector match in Firestore. Falling back to AI generation.", { highestSimilarity });
+    // Below 76%: immediately fall back to Gemini general knowledge
+    logger.info(`No KB match >= 76% (top: ${confidencePct}). Proceeding directly to Gemini.`);
     const aiResult = await generateAiAnswer(question, language);
 
     return {
         answer: aiResult.answer,
         source: aiResult.source || null,
         matchType: "ai_fallback",
-        similarity: highestSimilarity
+        docId: null,
+        similarity: highestSimilarity,
+        confidence: confidencePct
     };
 }
 
 // 4. Web UI endpoint (faq.html)
 app.post('/', async (req, res) => {
-    const { question, language = 'en' } = req.body;
+    const { question, language, forceAi = false } = req.body;
     if (!question) {
-        logger.warn("Web search rejected: Missing question.");
         return res.status(400).json({ error: "Missing question" });
     }
 
     try {
-        const result = await searchFaqWithRag(question, language);
+        const result = await searchFaqWithRag(question, language || null, Boolean(forceAi));
         return res.status(200).json(result);
     } catch (error) {
-        logger.error("CRITICAL ERROR in Web RAG search endpoint:", {
-            errorMessage: error.message,
-            errorStack: error.stack
-        });
+        logger.error("Error in Web RAG search endpoint:", { errorMessage: error.message });
         return res.status(500).json({ answer: "Internal server error during search.", source: null });
+    }
+});
+
+app.post('/feedback', async (req, res) => {
+    const { docId } = req.body;
+    if (!docId) {
+        return res.status(400).json({ error: "Missing docId" });
+    }
+
+    try {
+        await db.collection("faq_knowledge_base").doc(docId).update({
+            display_count: FieldValue.increment(1),
+            last_displayed_at: FieldValue.serverTimestamp()
+        });
+        logger.info(`User confirmed good answer. Incremented display_count for [${docId}].`);
+        return res.status(200).json({ success: true });
+    } catch (error) {
+        logger.error("Error updating feedback display_count:", { docId, errorMessage: error.message });
+        return res.status(500).json({ error: "Failed to record feedback" });
     }
 });
 
@@ -502,20 +508,42 @@ app.post('/messenger-webhook', async (req, res) => {
 }
 
                 // STANDARD QUERY FLOW (Uses shared RAG vector search + display_count increment)
-                if (messageText) {
-                    logger.info("Routing message to RAG search handler.", { senderPsid, isAdmin });
+if (messageText) {
+    const result = await searchFaqWithRag(messageText, null, false);
 
-                    const result = await searchFaqWithRag(messageText, 'en');
-                    let replyText = result.answer;
-                    if (result.source) replyText += `\n\n🔗 ${result.source}`;
+    if (result.matchType === "rag_database" && result.docId) {
+        let replyText = `${result.answer}\n\n📊 Match: ${result.confidence}`;
+        if (result.source) replyText += `\n🔗 ${result.source}`;
 
-                    await axios.post(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
-                        recipient: { id: senderPsid },
-                        message: { text: replyText }
-                    });
+        await axios.post(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
+            recipient: { id: senderPsid },
+            message: {
+                text: replyText,
+                quick_replies: [
+                    {
+                        content_type: "text",
+                        title: "👍 Good answer",
+                        payload: JSON.stringify({ action: "GOOD_ANSWER", docId: result.docId })
+                    },
+                    {
+                        content_type: "text",
+                        title: "👎 Ask Gemini",
+                        payload: JSON.stringify({ action: "ASK_GEMINI", question: messageText })
+                    }
+                ]
+            }
+        });
+    } else {
+        // Below 76%: already fell back to Gemini directly
+        let replyText = result.answer;
+        if (result.source) replyText += `\n\n🔗 ${result.source}`;
 
-                    logger.info("Successfully sent RAG/AI response to Messenger user.", { matchType: result.matchType });
-                }
+        await axios.post(`https://graph.facebook.com/v18.0/me/messages?access_token=${PAGE_ACCESS_TOKEN}`, {
+            recipient: { id: senderPsid },
+            message: { text: replyText }
+        });
+    }
+}
             }
         }
     } catch (error) {
