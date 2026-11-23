@@ -83,99 +83,101 @@ function appendMessage(text, sender) {
     return msgDiv;
 }
 
+// Helper for feedback radiobtn
+function makeThumbRadio(name, value, icon, text, onSelect) {
+    const label = document.createElement('label');
+    label.className = 'rag-thumb-option';
+
+    const input = document.createElement('input');
+    input.type = 'radio';
+    input.name = name;
+    input.value = value;
+
+    const span = document.createElement('span');
+    span.textContent = `${icon} ${text}`;
+
+    input.addEventListener('change', () => {
+        if (!input.checked) return;
+        label.classList.add('selected');
+        onSelect(input);
+    });
+
+    label.append(input, span);
+    return { label, input };
+}
 // Helper to format bot responses with optional clickable source links safely
 function setBotMessageContent(element, data, originalQuestion) {
     element.innerHTML = '';
 
-    // If KB match >= 76%, render answer on left and Match % + Radio toggle on right
+    const answerDiv = document.createElement('div');
+    answerDiv.textContent = data.answer || "Sorry, I couldn't find an answer.";
+
     if (data.matchType === 'rag_database' && data.docId) {
         const row = document.createElement('div');
         row.className = 'rag-response-row';
 
-        // Left column: Answer + optional source link
         const leftCol = document.createElement('div');
         leftCol.className = 'rag-answer-col';
-        leftCol.textContent = data.answer || "Sorry, I couldn't find an answer.";
+        leftCol.appendChild(answerDiv);
 
         if (data.source) {
             const link = document.createElement('a');
             link.href = data.source;
             link.target = '_blank';
             link.rel = 'noopener noreferrer';
-            link.style.display = 'block';
-            link.style.marginTop = '6px';
             link.textContent = '🔗 Source';
+            link.style.display = 'block';
+            link.style.marginTop = '4px';
             leftCol.appendChild(link);
         }
 
-        // Right column: Best match % + Radio button switch
         const rightCol = document.createElement('div');
         rightCol.className = 'rag-side-panel';
 
-        const badge = document.createElement('div');
-        badge.className = 'rag-confidence-badge';
-        badge.textContent = `Match: ${data.confidence}`;
-        rightCol.appendChild(badge);
+        const matchText = document.createElement('div');
+        matchText.textContent = `Best match in my knowledge base: ${data.confidence}`;
 
-        const radioGroup = document.createElement('div');
-        radioGroup.className = 'rag-radio-group';
-        const groupName = `feedback_${data.docId}_${Date.now()}`;
+        const group = `fb_${data.docId}_${Date.now()}`;
+        let done = false;
 
-        // Option 1: 👍 Good answer
-        const goodLabel = document.createElement('label');
-        goodLabel.className = 'rag-radio-label';
-        const goodRadio = document.createElement('input');
-        goodRadio.type = 'radio';
-        goodRadio.name = groupName;
-        goodRadio.value = 'good';
-        goodLabel.append(goodRadio, document.createTextNode('👍 Good answer'));
-
-        // Option 2: 👎 Ask Gemini
-        const geminiLabel = document.createElement('label');
-        geminiLabel.className = 'rag-radio-label';
-        const geminiRadio = document.createElement('input');
-        geminiRadio.type = 'radio';
-        geminiRadio.name = groupName;
-        geminiRadio.value = 'gemini';
-        geminiLabel.append(geminiRadio, document.createTextNode('👎 Ask Gemini'));
-
-        let feedbackSubmitted = false;
-
-        goodRadio.addEventListener('change', async () => {
-            if (!goodRadio.checked || feedbackSubmitted) return;
-            feedbackSubmitted = true;
-            geminiRadio.disabled = true;
-
-            try {
-                await fetch(`${CLOUD_FUNCTION_URL.replace(/\/$/, '')}/feedback`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ docId: data.docId })
-                });
-                badge.textContent = `Match: ${data.confidence} ✓`;
-            } catch (err) {
-                console.warn("Failed to record positive feedback:", err);
-            }
+        const good = makeThumbRadio(group, 'good', '👍', 'Good answer', async () => {
+            if (done) return;
+            done = true;
+            gemini.input.disabled = true;
+            await fetch(`${CLOUD_FUNCTION_URL.replace(/\/$/, '')}/feedback`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ docId: data.docId })
+            });
+            matchText.textContent = `Best match in my knowledge base: ${data.confidence} ✓`;
         });
 
-        geminiRadio.addEventListener('change', () => {
-            if (!geminiRadio.checked || feedbackSubmitted) return;
-            feedbackSubmitted = true;
-            goodRadio.disabled = true;
-            geminiRadio.disabled = true;
-
-            // Re-query backend with forceAi = true to get Gemini general knowledge
+        const gemini = makeThumbRadio(group, 'gemini', '👎', 'Ask Gemini', () => {
+            if (done) return;
+            done = true;
+            good.input.disabled = true;
+            gemini.input.disabled = true;
             submitQuestion(originalQuestion, true);
         });
 
-        radioGroup.append(goodLabel, geminiLabel);
-        rightCol.appendChild(radioGroup);
-
+        rightCol.append(matchText, good.label, gemini.label);
         row.append(leftCol, rightCol);
         element.appendChild(row);
         return;
     }
 
+    element.appendChild(answerDiv);
+    if (data.source) {
+        const link = document.createElement('a');
+        link.href = data.source;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+        link.textContent = '🔗 Source';
+        link.style.display = 'block';
+        link.style.marginTop = '4px';
+        element.appendChild(link);
+    }
+}
     // Direct Gemini fallback answer (either < 76% match or user clicked "Ask Gemini")
     const answerDiv = document.createElement('div');
     answerDiv.textContent = data.answer || "Sorry, I couldn't find an answer.";

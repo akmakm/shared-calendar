@@ -559,7 +559,7 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    gap: 14px;
+    gap: 12px;
 }
 .rag-answer-col {
     flex: 1;
@@ -569,24 +569,25 @@ body {
     flex-direction: column;
     align-items: flex-end;
     gap: 6px;
-    min-width: 145px;
-    padding-left: 12px;
-    border-left: 1px solid rgba(0, 0, 0, 0.12);
     font-size: 0.82em;
+    min-width: 150px;
+    padding-left: 10px;
+    border-left: 1px solid rgba(0, 0, 0, 0.12);
 }
-.rag-confidence-badge {
-    font-weight: 600;
-    color: #2e7d32;
-}
-.rag-radio-group {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-}
-.rag-radio-label {
-    display: flex;
+.rag-thumb-option {
+    display: inline-flex;
     align-items: center;
     gap: 5px;
     cursor: pointer;
-    user-select: none;
+    padding: 2px 6px;
+    border-radius: 5px;
+    opacity: 0.65;
+}
+.rag-thumb-option input[type="radio"] {
+    display: none;
+}
+.rag-thumb-option.selected {
+    opacity: 1;
+    font-weight: 700;
+    background: rgba(46, 125, 50, 0.14);
 }
